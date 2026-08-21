@@ -1,4 +1,4 @@
-@charset "utf-8";
+/* @charset "utf-8";
 /* CSS Document 
 
 Tooplate 2166 Ivory Flow
@@ -10,7 +10,7 @@ comentario
 /* ═══════════════════════════════════════════════
    RESET & VARIABLES
    ═══════════════════════════════════════════════ */
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+/*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
   --oat: #FCFAF8;
@@ -973,4 +973,4 @@ img { display: block; max-width: 100%; height: auto; }
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
-}
+} */
