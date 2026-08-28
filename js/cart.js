@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════
-// FitHer / OrbIsa — Carrito (componente reutilizable)
+//  OrbIsa — Carrito (componente reutilizable)
 // - Se autoinyecta en el <body>.
 // - Empieza SIEMPRE vacío salvo que ya haya datos
 //   guardados en localStorage de una visita anterior.
@@ -9,7 +9,7 @@
 // - Todo se persiste en localStorage.
 // ═══════════════════════════════════════════════
 
-const CART_STORAGE_KEY = 'fither_cart';
+const CART_STORAGE_KEY = 'orbisa-cart';
 
 // ── Modal shell (sin productos hardcodeados — se renderizan desde los datos) ──
 const cartModalHTML = `

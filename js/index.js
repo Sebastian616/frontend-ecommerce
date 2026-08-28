@@ -1,4 +1,4 @@
-// FitHer — interacciones mínimas (menú móvil + scroll reveal)
+// Orbisa — interacciones mínimas (menú móvil + scroll reveal)
 
 document.addEventListener('DOMContentLoaded', () => {
 

@@ -2,8 +2,7 @@
 /* ═══════════════════════════════════════════════
    BASE — reset, variables globales, utilidades
    compartidas por TODOS los demás archivos CSS.
-   Debe cargarse primero (antes que navbar.css,
-   hero.css, footer.css, cart.css, etc.).
+   Debe cargarse primero
    ═══════════════════════════════════════════════ */
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
