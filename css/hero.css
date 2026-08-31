@@ -1,5 +1,6 @@
 /* ═══════════════════════════════════════════════
    HERO — sección de apertura (texto izq / imagen der)
+   Requiere: base.css
    ═══════════════════════════════════════════════ */
 
 .hero {
@@ -56,18 +57,12 @@
 
 .hero-cta { opacity: 0; animation: fadeUp 0.9s var(--ease-soft) 0.9s forwards; }
 
+/* hero.css */
 .hero-image {
   position: relative;
   overflow: hidden;
   order: 2;
-}
-
-.hero-image::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 30% 30%, var(--blush-deep) 0%, transparent 60%);
-  z-index: 1;
+  padding: 24px 24px 24px 0; /* separa la imagen del borde de la sección */
 }
 
 .hero-image img {
@@ -76,8 +71,17 @@
   object-fit: cover;
   position: relative;
   z-index: 2;
+  border-radius: 28px; /* esquinas suaves */
 }
 
+.hero-image::before {
+  content: '';
+  position: absolute;
+  inset: 24px 24px 24px 0;
+  border-radius: 28px;
+  background: radial-gradient(circle at 30% 30%, var(--blush-deep) 0%, transparent 60%);
+  z-index: 1;
+}
 .hero-image-tag {
   position: absolute;
   bottom: 32px;
@@ -101,9 +105,13 @@
   .hero { grid-template-columns: 1fr; }
   .hero-content { order: 1; padding: 140px 40px 48px; }
   .hero-image { order: 2; height: 50vh; }
+  
 }
 
 @media (max-width: 768px) {
   .hero-content { padding: 128px 24px 40px; }
-  .hero-image { height: 42vh; min-height: 260px; }
+  .hero-image { height: 42vh; min-height: 260px; padding: 16px 16px 16px 0; }
+  .hero-image::before { inset: 16px 16px 16px 0; border-radius: 20px; }
+  .hero-image img { margin: 16px; border-radius: 20px; }
+
 }

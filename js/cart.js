@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════
-//  OrbIsa — Carrito (componente reutilizable)
+// FitHer / OrbIsa — Carrito (componente reutilizable)
 // - Se autoinyecta en el <body>.
 // - Empieza SIEMPRE vacío salvo que ya haya datos
 //   guardados en localStorage de una visita anterior.
@@ -9,7 +9,7 @@
 // - Todo se persiste en localStorage.
 // ═══════════════════════════════════════════════
 
-const CART_STORAGE_KEY = 'orbisa-cart';
+const CART_STORAGE_KEY = 'fither_cart';
 
 // ── Modal shell (sin productos hardcodeados — se renderizan desde los datos) ──
 const cartModalHTML = `
@@ -99,11 +99,11 @@ function closeCart() {
 }
 
 function bumpCartBadge() {
-  const badge = document.getElementById('cartCount');
-  if (!badge) return;
-  badge.classList.remove('bump'); // reinicia la animación si ya estaba corriendo
-  void badge.offsetWidth; // fuerza reflow para poder reiniciar la animación
-  badge.classList.add('bump');
+  document.querySelectorAll('.cart-count').forEach(badge => {
+    badge.classList.remove('bump'); // reinicia la animación si ya estaba corriendo
+    void badge.offsetWidth; // fuerza reflow para poder reiniciar la animación
+    badge.classList.add('bump');
+  });
 }
 
 // ═══════════════════════════════════════════════
@@ -147,11 +147,14 @@ function renderCart() {
   const totalQty = cartItems.reduce((sum, i) => sum + i.qty, 0);
   const subtotal = cartItems.reduce((sum, i) => sum + i.qty * i.price, 0);
 
-  const cartCountBadge = document.getElementById('cartCount');
+  // Actualiza TODOS los badges de contador que existan (navbar + hamburguesa)
+  document.querySelectorAll('.cart-count').forEach(badge => {
+    badge.textContent = totalQty;
+  });
+
   const cartModalCount = document.querySelector('.cart-modal-count');
   const cartSubtotalValue = document.querySelector('.cart-subtotal-value');
 
-  if (cartCountBadge) cartCountBadge.textContent = totalQty;
   if (cartModalCount) cartModalCount.textContent = `(${totalQty})`;
   if (cartSubtotalValue) cartSubtotalValue.textContent = formatPrice(subtotal);
 }
@@ -192,8 +195,10 @@ function removeItem(id) {
 
 document.addEventListener('click', (e) => {
 
-  // Abrir / cerrar el modal
-  if (e.target.closest('#cartTrigger')) { openCart(); return; }
+  // Abrir / cerrar el modal (funciona con CUALQUIER botón que tenga
+  // la clase .cart-open-btn — así podemos tener uno en el navbar de
+  // escritorio y otro dentro del menú hamburguesa sin conflicto de IDs)
+  if (e.target.closest('.cart-open-btn')) { openCart(); return; }
   if (e.target.closest('#cartClose')) { closeCart(); return; }
   if (e.target.closest('#cartOverlay')) { closeCart(); return; }
   if (e.target.closest('#cartContinue')) { closeCart(); return; }
