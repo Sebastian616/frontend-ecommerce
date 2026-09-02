@@ -107,6 +107,35 @@ function bumpCartBadge() {
 }
 
 // ═══════════════════════════════════════════════
+// ALERTA CON SWEETALERT2 (solo feedback visual —
+// el carrito real sigue viviendo en localStorage,
+// esto no cambia esa lógica en absoluto)
+// ═══════════════════════════════════════════════
+function showAddedAlert(product) {
+  if (typeof Swal === 'undefined') {
+    console.warn('SweetAlert2 no está cargado. Agrega el <script> del CDN en tu HTML.');
+    return;
+  }
+
+  Swal.fire({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 2200,
+    timerProgressBar: true,
+    icon: 'success',
+    iconColor: '#E23789',
+    title: `${product.name} agregado`,
+    text: 'Se agregó al carrito correctamente',
+    background: '#FFF6FA',
+    color: '#241233',
+    customClass: {
+      popup: 'fither-toast'
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════════════
 
@@ -213,15 +242,17 @@ document.addEventListener('click', (e) => {
     const priceText = card.querySelector('.product-card-price')?.textContent || '0';
     const image = card.querySelector('.product-card-media img')?.getAttribute('src') || '';
 
-    addItem({
+    const newItem = {
       id: slugify(name),
       name,
       price: parsePrice(priceText),
       image,
       variant: ''
-    });
+    };
 
+    addItem(newItem);
     bumpCartBadge(); // feedback visual sin bloquear la navegación
+    showAddedAlert(newItem); // 🔔 toast de SweetAlert2
     return;
   }
 

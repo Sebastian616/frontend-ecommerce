@@ -190,6 +190,31 @@
 .cart-empty svg { width: 44px; height: 44px; stroke: var(--plum-faint); fill: none; stroke-width: 1.3; }
 
 /* ═══════════════════════════════════════════════
+   TOAST "AGREGADO AL CARRITO" (SweetAlert2)
+   ═══════════════════════════════════════════════ */
+.fither-toast {
+  border-radius: 16px !important;
+  box-shadow: 0 10px 32px rgba(226, 55, 137, 0.18) !important;
+  font-family: 'Manrope', sans-serif !important;
+}
+
+.fither-toast .swal2-title {
+  font-family: 'Cormorant Garamond', serif !important;
+  font-weight: 600 !important;
+  font-size: 17px !important;
+  color: var(--plum) !important;
+}
+
+.fither-toast .swal2-html-container {
+  font-size: 12px !important;
+  color: var(--plum-muted) !important;
+}
+
+.fither-toast .swal2-timer-progress-bar {
+  background: var(--pink) !important;
+}
+
+/* ═══════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════ */
 @media (max-width: 480px) {
