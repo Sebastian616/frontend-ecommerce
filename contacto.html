@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contacto — Orbisa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500;1,600&family=Manrope:wght@200;300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./css/index.css">
+<link rel="stylesheet" href="./css/navbar.css">
+<link rel="stylesheet" href="./css/contacto.css">
+<link rel="stylesheet" href="./css/footer.css">
+<link rel="stylesheet" href="./css/cart.css">
+<link rel="icon" type="image/png" href="./img/logotransparente.png">
+</head>
+<body>
+
+<!-- ═══════ ANNOUNCEMENT BAR ═══════ -->
+<div class="announce-bar">🚚 Envío gratis en compras superiores a $100.000 COP</div>
+
+<!-- ═══════ BRAND MARK ═══════ -->
+<div class="brand-mark" aria-hidden="true">
+    <img src="./img/logotransparente.png" alt="">
+    Orb<em>Isa</em>
+</div>
+
+<!-- ═══════ FLOATING PILL NAV ═══════ -->
+<div id="navbar"></div>
+
+<!-- ═══════ MOBILE ═══════ -->
+<button class="hamburger" aria-label="Abrir menú"><span></span><span></span><span></span></button>
+<nav class="mobile-nav" aria-label="Navegación móvil">
+  <a href="./index.html" class="active">Inicio</a>
+  <a href="./productos.html">Tienda</a>
+  <a href="#promo">Nosotros</a>
+  <a href="./contacto.html">Contacto</a>
+  <button class="mobile-cart-btn cart-open-btn" id="cartTriggerMobile" aria-label="Abrir carrito de compras" aria-haspopup="dialog" aria-controls="cartModal">
+  <svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+  Ver carrito
+  <span class="cart-count">0</span>
+</button>
+</nav>
+
+<!-- ═══════ HEADER ═══════ -->
+<header class="contact-header">
+  <div class="contact-eyebrow">Estamos para ayudarte</div>
+  <h1 class="contact-title">Hablemos <em>de moda</em></h1>
+  <p class="contact-subtitle">¿Dudas sobre tallas, envíos o un pedido? Escríbenos y te respondemos lo antes posible.</p>
+</header>
+
+<!-- ═══════ FORM + INFO ═══════ -->
+<section class="contact-layout">
+
+  <div class="contact-form-card" id="contactFormCard">
+    <form id="contactForm" action="https://formspree.io/f/xqpkbybn" method="POST">
+      <input type="hidden" name="_subject" value="Nuevo mensaje de contacto — OrbIsa">
+      <div class="contact-field-row">
+        <div class="contact-field">
+          <label for="contactName">Nombre *</label>
+          <input type="text" id="contactName" name="name" placeholder="Tu nombre" required>
+        </div>
+        <div class="contact-field">
+          <label for="contactEmail">Correo *</label>
+          <input type="email" id="contactEmail" name="email" placeholder="juaperez@correo.com" required>
+        </div>
+      </div>
+
+      <div class="contact-field">
+        <label for="contactSubject">Asunto</label>
+        <input type="text" id="contactSubject" name="subject" placeholder="¿En qué te podemos ayudar?">
+      </div>
+
+      <div class="contact-field">
+        <label for="contactMessage">Mensaje *</label>
+        <textarea id="contactMessage" name="message" placeholder="Cuéntanos los detalles..." required></textarea>
+      </div>
+
+      <button type="submit" class="btn-pill contact-submit" id="contactSubmitBtn">
+        <span>Enviar mensaje</span>
+        <svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
+      </button>
+
+      <p class="contact-form-note">Al enviar este formulario aceptas que te contactemos por correo respecto a tu consulta.</p>
+    </form>
+
+    <div class="contact-success" id="contactSuccess">
+      <div class="contact-success-icon">
+        <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+      </div>
+      <h3>¡Mensaje enviado!</h3>
+      <p>Gracias por escribirnos. Nuestro equipo te responderá dentro de las próximas 24 horas hábiles.</p>
+    </div>
+
+    <p class="contact-form-error" id="contactError"></p>
+  </div>
+
+  <div class="contact-info-card">
+    <div class="contact-info-title">Otras formas de contactarnos</div>
+    <p class="contact-info-text">Elige el canal que prefieras — respondemos rápido en todos.</p>
+
+    <ul class="contact-info-list">
+      <li class="contact-info-item">
+        <div class="contact-info-icon">
+          <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg>
+        </div>
+        <div>
+          <div class="contact-info-label">Correo</div>
+          <div class="contact-info-value"><a href="mailto:hola@orbisa.com">contacto@orbisa.store</a></div>
+        </div>
+      </li>
+      <li class="contact-info-item">
+        <div class="contact-info-icon">
+          <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.68 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.32 1.85.55 2.81.68A2 2 0 0 1 22 16.92z"/></svg>
+        </div>
+        <div>
+          <div class="contact-info-label">Teléfono</div>
+          <div class="contact-info-value"><a href="tel:+573001234567">+57 313 613 8231</a></div>
+        </div>
+      </li>
+      <li class="contact-info-item">
+        <div class="contact-info-icon">
+          <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <div>
+          <div class="contact-info-label">Dirección</div>
+          <div class="contact-info-value">Cra. 52ᴬ #52a-19</div>
+        </div>
+      </li>
+    </ul>
+
+    <div class="contact-hours">
+      <div class="contact-hours-row"><span>Lunes – Viernes</span><span>9:30 AM – 6:30 PM</span></div>
+      <div class="contact-hours-row"><span>Sábados</span><span>9:30 AM – 6:30 PM</span></div>
+      <div class="contact-hours-row"><span>Domingos</span><span>Cerrado</span></div>
+    </div>
+
+    <div class="contact-social">
+      <a href="#" aria-label="Instagram"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg></a>
+      <a href="#" aria-label="Facebook"><svg viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg></a>
+      <a href="#" aria-label="TikTok"><svg viewBox="0 0 24 24"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/></svg></a>
+    </div>
+  </div>
+
+</section>
+
+<!-- ═══════ FOOTER ═══════ -->
+<div id="footer"></div>
+
+<script src="./js/navbar.js"></script>
+<script src="./js/footer.js"></script>
+<script src="./js/cart.js"></script>
+<script src="./js/contacto.js"></script>
+<script src="./js/index.js"></script>
+</body>
+</html>

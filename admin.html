@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de administración — Orbisa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500;1,600&family=Manrope:wght@200;300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./css/index.css">
+<link rel="stylesheet" href="./css/admin.css">
+<link rel="icon" type="image/png" href="./img/logotransparente.png">
+</head>
+<body>
+
+<!-- ═══════ TOPBAR ═══════ -->
+<div class="admin-topbar">
+  <div class="admin-brand">
+    <img src="./img/logotransparente.png" alt="">
+    Orb<em>Isa</em>
+  </div>
+  <span class="admin-topbar-tag">Panel de administración</span>
+  <nav class="admin-topbar-links">
+    <a href="index.html">Ver sitio</a>
+    <a href="productos.html">Ver tienda</a>
+  </nav>
+</div>
+
+<div class="admin-layout">
+
+  <!-- ═══════ FORMULARIO ═══════ -->
+  <div class="admin-form-card" id="adminFormCard">
+    <div class="admin-form-title">Agregar producto</div>
+    <div class="admin-form-subtitle">Se guarda directo en el catálogo de la tienda.</div>
+
+    <div class="admin-editing-banner" id="editingBanner">
+      <span id="editingBannerText">Editando producto</span>
+      <button type="button" id="cancelEditBtn">Cancelar</button>
+    </div>
+
+    <form id="productForm">
+      <div class="admin-field">
+        <label for="fieldName">Nombre del producto *</label>
+        <input type="text" id="fieldName" placeholder="Ej: Top deportivo Breeze" required>
+      </div>
+
+      <div class="admin-field-row">
+        <div class="admin-field">
+          <label for="fieldPrice">Precio (COP) *</label>
+          <input type="number" id="fieldPrice" placeholder="89000" min="1" required>
+        </div>
+        <div class="admin-field">
+          <label for="fieldBadge">Etiqueta</label>
+          <input type="text" id="fieldBadge" placeholder="Nuevo">
+        </div>
+      </div>
+
+      <div class="admin-field">
+        <label for="fieldImage">Ruta de la imagen</label>
+        <input type="text" id="fieldImage" placeholder="img/mi-producto.jpg">
+        <div class="admin-field-hint">Ruta relativa dentro de tu carpeta del proyecto (ej: img/top.jpg).</div>
+      </div>
+
+      <div class="admin-field-row">
+        <div class="admin-field">
+          <label for="fieldRating">Calificación</label>
+          <input type="number" id="fieldRating" placeholder="4.5" min="0" max="5" step="0.1">
+        </div>
+        <div class="admin-field">
+          <label for="fieldReviews">N.º de reseñas</label>
+          <input type="number" id="fieldReviews" placeholder="128" min="0">
+        </div>
+      </div>
+
+      <div class="admin-form-actions">
+        <button type="submit" class="btn-pill">
+          <span id="submitBtnLabel">Guardar producto</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ═══════ LISTA DE PRODUCTOS ═══════ -->
+  <div class="admin-products">
+    <div class="admin-list-header">
+      <div>
+        <div class="admin-list-title">Catálogo actual</div>
+        <div class="admin-list-count" id="adminCount"></div>
+      </div>
+      <button type="button" class="admin-clear-all" id="clearAllBtn">Vaciar todo</button>
+    </div>
+
+    <div class="admin-table" id="adminList">
+      <!-- admin.js llena esto dinámicamente -->
+    </div>
+  </div>
+
+</div>
+
+<div class="admin-toast" id="adminToast"></div>
+
+<script src="./js/admin.js"></script>
+</body>
+</html>
