@@ -1,8 +1,8 @@
 const navbar = `
 <nav class="pill-nav" aria-label="Navegación principal">
-  <a href="index.html">Inicio</a>
+  <a href="index.html#hero">Inicio</a>
   <a href="productos.html">Tienda</a>
-  <a href="index.html#promo">Nosotros</a>
+  <a href="nosotros.html">Nosotros</a>
   <a href="contacto.html">Contacto</a>
   <button class="mini-cart cart-open-btn" id="cartTrigger" aria-label="Abrir carrito de compras" aria-haspopup="dialog" aria-controls="cartModal">
     <svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
