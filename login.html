@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iniciar sesión — Orbisa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500;1,600&family=Manrope:wght@200;300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./css/index.css">
+<link rel="stylesheet" href="./css/login.css">
+<link rel="icon" type="image/png" href="./img/logotransparente.png">
+</head>
+<body>
+
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <img src="./img/logotransparente.png" alt="">
+      Orb<em>Isa</em>
+    </div>
+
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" data-tab="login">Iniciar sesión</button>
+      <button type="button" class="auth-tab" data-tab="register">Registrarse</button>
+    </div>
+
+    <p class="auth-error" id="authError"></p>
+
+    <!-- ═══════ LOGIN ═══════ -->
+    <form class="auth-form active" id="loginForm">
+      <div class="auth-field">
+        <label for="loginUsername">Usuario o correo</label>
+        <input type="text" id="loginUsername" autocomplete="username" required>
+      </div>
+      <div class="auth-field">
+        <label for="loginPassword">Contraseña</label>
+        <input type="password" id="loginPassword" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn-pill auth-submit">Iniciar sesión</button>
+    </form>
+
+    <!-- ═══════ REGISTRO ═══════ -->
+    <form class="auth-form" id="registerForm">
+      <div class="auth-field">
+        <label for="registerName">Nombre</label>
+        <input type="text" id="registerName" autocomplete="name" required>
+      </div>
+      <div class="auth-field">
+        <label for="registerEmail">Correo</label>
+        <input type="email" id="registerEmail" autocomplete="email" required>
+      </div>
+      <div class="auth-field">
+        <label for="registerPassword">Contraseña</label>
+        <input type="password" id="registerPassword" autocomplete="new-password" minlength="6" required>
+      </div>
+      <div class="auth-field">
+        <label for="registerConfirm">Confirmar contraseña</label>
+        <input type="password" id="registerConfirm" autocomplete="new-password" minlength="6" required>
+      </div>
+      <button type="submit" class="btn-pill auth-submit">Crear cuenta</button>
+    </form>
+
+    <a href="index.html" class="auth-back">← Volver al inicio</a>
+  </div>
+</div>
+
+<script src="./js/auth.js"></script>
+<script src="./js/login.js"></script>
+</body>
+</html>

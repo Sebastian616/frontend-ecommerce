@@ -10,6 +10,7 @@
 // ═══════════════════════════════════════════════
 
 const CART_STORAGE_KEY = 'fither_cart';
+const ORDERS_STORAGE_KEY = 'orbisa_orders';
 
 // ── Modal shell (sin productos hardcodeados — se renderizan desde los datos) ──
 const cartModalHTML = `
@@ -30,7 +31,7 @@ const cartModalHTML = `
       <span class="cart-subtotal-value">$0 COP</span>
     </div>
     <p class="cart-shipping-note">Envío gratis en compras superiores a $100.000 COP 🎉</p>
-    <button class="btn-pill cart-checkout">Finalizar compra
+    <button class="btn-pill cart-checkout" id="cartCheckoutBtn">Finalizar compra
       <svg viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
     </button>
     <button class="cta-link cta-link--dark cart-continue" id="cartContinue">Seguir comprando</button>
@@ -126,7 +127,7 @@ function showAddedAlert(product) {
     icon: 'success',
     iconColor: '#E23789',
     title: `${product.name} agregado`,
-    text: 'Se agregó al carrito correctamente',
+    text: 'Se sumó al carrito correctamente',
     background: '#FFF6FA',
     color: '#241233',
     customClass: {
@@ -218,6 +219,86 @@ function removeItem(id) {
 }
 
 // ═══════════════════════════════════════════════
+// CHECKOUT — convierte el carrito actual en un
+// pedido guardado en 'orbisa_orders' (lo lee pedidos.html)
+// ═══════════════════════════════════════════════
+
+function loadOrders() {
+  try {
+    const raw = localStorage.getItem(ORDERS_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.warn('No se pudieron leer los pedidos guardados.', e);
+    return [];
+  }
+}
+
+function saveOrders(orders) {
+  try {
+    localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
+  } catch (e) {
+    console.warn('No se pudo guardar el pedido.', e);
+  }
+}
+
+function handleCheckout() {
+  if (cartItems.length === 0) return;
+
+  // Bloquea la compra si no hay sesión — manda a login y de vuelta aquí después
+  if (typeof getSession !== 'function' || !getSession()) {
+    const currentPage = location.pathname.split('/').pop() || 'index.html';
+    location.href = `login.html?redirect=${encodeURIComponent(currentPage)}`;
+    return;
+  }
+
+  const session = getSession();
+  const subtotal = cartItems.reduce((sum, i) => sum + i.qty * i.price, 0);
+
+  const order = {
+    id: 'ORD-' + Date.now().toString(36).toUpperCase(),
+    date: new Date().toISOString(),
+    status: 'Nuevo',
+    buyer: { name: session.name, email: session.email },
+    items: cartItems.map(i => ({
+      id: i.id,
+      name: i.name,
+      image: i.image,
+      variant: i.variant || '',
+      price: i.price,
+      qty: i.qty
+    })),
+    total: subtotal
+  };
+
+  const orders = loadOrders();
+  orders.unshift(order); // el pedido más reciente primero
+  saveOrders(orders);
+
+  // Vaciar el carrito tras confirmar el pedido
+  cartItems = [];
+  saveCart(cartItems);
+  renderCart();
+  closeCart();
+  showOrderConfirmation(order);
+}
+
+function showOrderConfirmation(order) {
+  // Reutiliza el mismo toast visual que el "bump" del badge, pero como
+  // aviso flotante simple, para no depender de más markup nuevo.
+  const toast = document.createElement('div');
+  toast.className = 'order-confirm-toast';
+  toast.textContent = `¡Pedido ${order.id} confirmado! Total: ${formatPrice(order.total)}`;
+  document.body.appendChild(toast);
+
+  requestAnimationFrame(() => toast.classList.add('show'));
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 400);
+  }, 3200);
+}
+
+// ═══════════════════════════════════════════════
 // EVENTOS (delegados en document — funcionan sin
 // importar cuándo se inyecten navbar/productos)
 // ═══════════════════════════════════════════════
@@ -231,6 +312,7 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('#cartClose')) { closeCart(); return; }
   if (e.target.closest('#cartOverlay')) { closeCart(); return; }
   if (e.target.closest('#cartContinue')) { closeCart(); return; }
+  if (e.target.closest('#cartCheckoutBtn')) { handleCheckout(); return; }
 
   // Agregar producto desde una tarjeta (.product-card) del catálogo
   const addBtn = e.target.closest('.product-cart-btn');

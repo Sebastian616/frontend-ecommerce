@@ -45,6 +45,7 @@
   transition: color 0.3s;
 }
 .admin-topbar-links a:hover { color: var(--pink-deep); }
+.admin-topbar-links a.active { color: var(--pink-deep); }
 
 .admin-layout {
   display: grid;

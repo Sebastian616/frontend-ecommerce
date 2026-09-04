@@ -220,3 +220,26 @@
 @media (max-width: 480px) {
   .cart-modal { width: 100vw; }
 }
+
+/* ═══════════════════════════════════════════════
+   TOAST DE CONFIRMACIÓN DE PEDIDO
+   ═══════════════════════════════════════════════ */
+.order-confirm-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: var(--plum);
+  color: var(--white);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 14px 24px;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s var(--ease-soft), transform 0.35s var(--ease-soft);
+  z-index: 3000;
+  box-shadow: 0 10px 30px rgba(36, 18, 51, 0.25);
+}
+
+.order-confirm-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }

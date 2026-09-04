@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════
 // OrbIsa — Panel de administración de productos
 // Lee y escribe en la MISMA clave de localStorage
-// que consume productos.html (js/products.js):
+// que consume productos.html (js/product.js):
 // 'orbisa_products'
 // ═══════════════════════════════════════════════
 
@@ -40,6 +40,14 @@ function adminSlugify(text) {
 
 function adminFormatPrice(n) {
   return '$' + Number(n).toLocaleString('es-CO') + ' COP';
+}
+
+// Devuelve siempre un array de fotos, sin importar si el producto
+// se guardó con "images" (array nuevo) o con el "image" (string viejo).
+function adminGetProductImages(p) {
+  if (Array.isArray(p.images) && p.images.length) return p.images;
+  if (p.image) return [p.image];
+  return [];
 }
 
 function showToast(message) {
@@ -81,12 +89,16 @@ function renderAdminList() {
     return;
   }
 
-  listEl.innerHTML = products.map(p => `
+  listEl.innerHTML = products.map(p => {
+    const images = adminGetProductImages(p);
+    const thumb = images[0] || '';
+    const photoCount = images.length > 1 ? ` · ${images.length} fotos` : '';
+    return `
     <div class="admin-row" data-id="${p.id}">
-      <img class="admin-row-thumb" src="${p.image || ''}" alt="${p.name}" onerror="this.style.visibility='hidden'">
+      <img class="admin-row-thumb" src="${thumb}" alt="${p.name}" onerror="this.style.visibility='hidden'">
       <div class="admin-row-info">
         <div class="admin-row-name">${p.name}</div>
-        <div class="admin-row-meta">${p.badge ? p.badge + ' · ' : ''}${p.rating ? `★ ${p.rating}${p.reviews ? ` (${p.reviews})` : ''}` : 'Sin reseñas'}</div>
+        <div class="admin-row-meta">${p.badge ? p.badge + ' · ' : ''}${p.rating ? `★ ${p.rating}${p.reviews ? ` (${p.reviews})` : ''}` : 'Sin reseñas'}${photoCount}</div>
       </div>
       <div class="admin-row-price">${adminFormatPrice(p.price)}</div>
       <div class="admin-row-actions">
@@ -94,7 +106,8 @@ function renderAdminList() {
         <button class="admin-icon-btn danger admin-delete-btn" aria-label="Eliminar producto">${trashIconSVG}</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // ═══════════════════════════════════════════════
@@ -104,14 +117,20 @@ function renderAdminList() {
 function fillFormWithProduct(p) {
   document.getElementById('fieldName').value = p.name || '';
   document.getElementById('fieldPrice').value = p.price ?? '';
-  document.getElementById('fieldImage').value = p.image || '';
   document.getElementById('fieldBadge').value = p.badge || '';
   document.getElementById('fieldRating').value = p.rating ?? '';
   document.getElementById('fieldReviews').value = p.reviews ?? '';
+
+  if (typeof window.setProductImageUrls === 'function') {
+    window.setProductImageUrls(adminGetProductImages(p));
+  }
 }
 
 function resetForm() {
   document.getElementById('productForm').reset();
+  if (typeof window.setProductImageUrls === 'function') {
+    window.setProductImageUrls([]);
+  }
   editingId = null;
   document.getElementById('editingBanner').classList.remove('active');
   document.getElementById('submitBtnLabel').textContent = 'Guardar producto';
@@ -154,7 +173,9 @@ function handleSubmit(e) {
 
   const name = document.getElementById('fieldName').value.trim();
   const price = Number(document.getElementById('fieldPrice').value);
-  const image = document.getElementById('fieldImage').value.trim();
+  const images = typeof window.getProductImageUrls === 'function'
+    ? window.getProductImageUrls()
+    : [];
   const badge = document.getElementById('fieldBadge').value.trim();
   const ratingRaw = document.getElementById('fieldRating').value;
   const reviewsRaw = document.getElementById('fieldReviews').value;
@@ -170,7 +191,7 @@ function handleSubmit(e) {
     id: editingId || adminSlugify(name),
     name,
     price,
-    image,
+    images,
     ...(badge ? { badge } : {}),
     ...(ratingRaw ? { rating: Number(ratingRaw) } : {}),
     ...(reviewsRaw ? { reviews: Number(reviewsRaw) } : {}),

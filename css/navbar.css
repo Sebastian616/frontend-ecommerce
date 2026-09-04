@@ -56,6 +56,19 @@
   color: var(--white);
 }
 
+.nav-account {
+  font-family: 'Manrope', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--plum-muted);
+  padding: 0 4px 0 10px;
+  white-space: nowrap;
+}
+
+.nav-account a { transition: color 0.3s; }
+.nav-account a:hover { color: var(--pink-deep); }
+
 /* ═══════════════════════════════════════════════
    BRAND MARK (fixed, top-left)
    ═══════════════════════════════════════════════ */

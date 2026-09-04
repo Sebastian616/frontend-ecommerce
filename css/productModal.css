@@ -1,0 +1,133 @@
+/* ═══════════════════════════════════════════════
+   MODAL DE PRODUCTO — carrusel de fotos (Bootstrap)
+   Requiere: base.css (variables de color) + Bootstrap 5
+   ═══════════════════════════════════════════════ */
+
+.product-zoom-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--white, #fff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(36, 18, 51, 0.16);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.3s var(--ease-soft, ease), transform 0.3s var(--ease-soft, ease);
+}
+.product-zoom-btn svg { width: 16px; height: 16px; stroke: var(--pink-deep, var(--pink)); fill: none; stroke-width: 1.8; }
+
+.product-card-media {
+  cursor: pointer;
+}
+.product-card-media:hover .product-zoom-btn,
+.product-card-media:focus-visible .product-zoom-btn {
+  opacity: 1;
+  transform: translateY(0);
+}
+.product-card-media:focus-visible {
+  outline: 2px solid var(--pink);
+  outline-offset: 3px;
+}
+
+#productModal .modal-dialog {
+  max-width: 560px;
+}
+
+#productModal .modal-content {
+  border: none;
+  border-radius: 28px;
+  overflow: hidden;
+  background: var(--white, #fff);
+  box-shadow: 0 24px 60px rgba(36, 18, 51, 0.24);
+}
+
+#productModal .modal-header {
+  border-bottom: none;
+  padding: 22px 26px 8px;
+}
+
+#productModal .modal-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--plum);
+}
+
+#productModal .btn-close {
+  opacity: 1;
+  background-image: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-color: var(--blush-mid);
+  position: relative;
+}
+#productModal .btn-close::before,
+#productModal .btn-close::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 13px;
+  height: 1.5px;
+  background: var(--plum);
+  transform-origin: center;
+}
+#productModal .btn-close::before { transform: translate(-50%, -50%) rotate(45deg); }
+#productModal .btn-close::after  { transform: translate(-50%, -50%) rotate(-45deg); }
+
+#productModal .modal-body {
+  padding: 8px 26px 26px;
+}
+
+#productCarousel {
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--blush-mid);
+}
+
+#productCarousel .carousel-item img {
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+}
+
+#productCarousel .carousel-control-prev,
+#productCarousel .carousel-control-next {
+  width: 44px;
+  height: 44px;
+  top: 50%;
+  transform: translateY(-50%);
+  bottom: auto;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  opacity: 1;
+}
+#productCarousel .carousel-control-prev { left: 14px; }
+#productCarousel .carousel-control-next { right: 14px; }
+#productCarousel .carousel-control-prev-icon,
+#productCarousel .carousel-control-next-icon {
+  width: 16px;
+  height: 16px;
+  filter: invert(14%) sepia(23%) saturate(1200%) hue-rotate(255deg);
+}
+
+#productCarousel .carousel-indicators {
+  margin-bottom: 14px;
+}
+#productCarousel .carousel-indicators [data-bs-target] {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.6);
+  opacity: 1;
+}
+#productCarousel .carousel-indicators .active {
+  background: var(--pink);
+}

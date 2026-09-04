@@ -4,6 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panel de administración — Orbisa</title>
+
+<!-- ═══════ GUARDIA DE ACCESO ═══════
+     Se ejecuta ANTES de cargar cualquier otra cosa. Si no hay
+     sesión de admin activa, redirige a login.html de inmediato. -->
+<script>
+(function () {
+  try {
+    var raw = localStorage.getItem('orbisa_session');
+    var session = raw ? JSON.parse(raw) : null;
+    if (!session) {
+      location.replace('login.html');
+    } else if (session.role !== 'admin') {
+      // Tiene sesión pero no es admin — no lo mandamos a login (ya está
+      // logueado), directo a que no tiene nada que hacer aquí.
+      location.replace('index.html');
+    }
+  } catch (e) {
+    location.replace('login.html');
+  }
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500;1,600&family=Manrope:wght@200;300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./css/index.css">
@@ -13,17 +34,7 @@
 <body>
 
 <!-- ═══════ TOPBAR ═══════ -->
-<div class="admin-topbar">
-  <div class="admin-brand">
-    <img src="./img/logotransparente.png" alt="">
-    Orb<em>Isa</em>
-  </div>
-  <span class="admin-topbar-tag">Panel de administración</span>
-  <nav class="admin-topbar-links">
-    <a href="index.html">Ver sitio</a>
-    <a href="productos.html">Ver tienda</a>
-  </nav>
-</div>
+<div id="adminNav"></div>
 
 <div class="admin-layout">
 
@@ -55,10 +66,33 @@
       </div>
 
       <div class="admin-field">
-        <label for="fieldImage">Ruta de la imagen</label>
-        <input type="text" id="fieldImage" placeholder="img/mi-producto.jpg">
-        <div class="admin-field-hint">Ruta relativa dentro de tu carpeta del proyecto (ej: img/top.jpg).</div>
+        <label>Fotos del producto</label>
+        <div id="imageFieldsList" class="admin-image-list">
+          <div class="admin-image-row">
+            <input type="text" class="admin-image-input" placeholder="img/mi-producto-1.jpg">
+            <button type="button" class="admin-image-remove" aria-label="Quitar imagen">&times;</button>
+          </div>
+        </div>
+        <button type="button" id="addImageFieldBtn" class="admin-image-add">+ Agregar otra foto</button>
+        <div class="admin-field-hint">La primera foto es la que se ve en la tarjeta del producto. Agrega varias para mostrar un carrusel al hacer click.</div>
       </div>
+
+      <style>
+        .admin-image-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+        .admin-image-row { display: flex; gap: 8px; align-items: center; }
+        .admin-image-row input { flex: 1; }
+        .admin-image-remove {
+          flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+          border: none; background: var(--blush-mid, #f4e9ef); color: var(--plum, #241233);
+          font-size: 16px; line-height: 1; cursor: pointer;
+        }
+        .admin-image-remove:hover { background: var(--pink, #e23789); color: #fff; }
+        .admin-image-add {
+          border: 1px dashed var(--pink, #e23789); background: none; color: var(--pink, #e23789);
+          font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 999px; cursor: pointer;
+        }
+        .admin-image-add:hover { background: var(--blush-mid, #f4e9ef); }
+      </style>
 
       <div class="admin-field-row">
         <div class="admin-field">
@@ -98,6 +132,54 @@
 
 <div class="admin-toast" id="adminToast"></div>
 
+<script>
+  (function () {
+    const list = document.getElementById('imageFieldsList');
+    const addBtn = document.getElementById('addImageFieldBtn');
+
+    function makeRow(value) {
+      const row = document.createElement('div');
+      row.className = 'admin-image-row';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'admin-image-input';
+      input.placeholder = 'img/mi-producto.jpg';
+      input.value = value || '';
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'admin-image-remove';
+      removeBtn.setAttribute('aria-label', 'Quitar imagen');
+      removeBtn.innerHTML = '&times;';
+      removeBtn.addEventListener('click', () => {
+        if (list.children.length > 1) row.remove();
+        else input.value = '';
+      });
+      row.appendChild(input);
+      row.appendChild(removeBtn);
+      return row;
+    }
+
+    addBtn.addEventListener('click', () => list.appendChild(makeRow()));
+
+    // admin.js llama a estas dos funciones globales para leer
+    // y para precargar las fotos al editar un producto existente.
+    window.getProductImageUrls = function () {
+      return Array.from(list.querySelectorAll('.admin-image-input'))
+        .map((input) => input.value.trim())
+        .filter(Boolean);
+    };
+
+    window.setProductImageUrls = function (urls) {
+      list.innerHTML = '';
+      const values = Array.isArray(urls) && urls.length ? urls : [''];
+      values.forEach((v) => list.appendChild(makeRow(v)));
+    };
+  })();
+</script>
+
+ <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="./js/auth.js"></script>
+<script src="./js/adminNav.js"></script>
 <script src="./js/admin.js"></script>
 </body>
 </html>
