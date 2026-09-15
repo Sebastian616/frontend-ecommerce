@@ -1,0 +1,152 @@
+/* ═══════════════════════════════════════════════
+   PEDIDOS — lista de compras realizadas
+   Requiere: base.css, admin.css
+   ═══════════════════════════════════════════════ */
+
+.orders-page {
+  padding: 48px 64px 100px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.orders-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.orders-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--plum);
+}
+
+.orders-count { font-size: 13px; color: var(--plum-muted); margin-top: 2px; }
+
+.orders-list { display: flex; flex-direction: column; gap: 18px; }
+
+.order-card {
+  background: var(--white);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 6px 28px rgba(36, 18, 51, 0.05);
+}
+
+.order-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--blush-mid);
+}
+
+.order-id {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--plum);
+}
+
+.order-date { font-size: 12px; color: var(--plum-muted); margin-top: 4px; }
+
+.order-status-badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.order-status-badge[data-status="Nuevo"] { background: var(--pink-light); color: var(--pink-deep); }
+.order-status-badge[data-status="En proceso"] { background: #FFF4D6; color: #9A7200; }
+.order-status-badge[data-status="Enviado"] { background: #DCEBFF; color: #2461C7; }
+.order-status-badge[data-status="Entregado"] { background: #DFF5E3; color: #1F8A3D; }
+.order-status-badge[data-status="Cancelado"] { background: #F3F0F5; color: var(--plum-muted); }
+
+.order-items { display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px; }
+
+.order-item-row { display: flex; align-items: center; gap: 12px; }
+
+.order-item-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--blush-mid);
+  flex-shrink: 0;
+}
+
+.order-item-info { flex: 1; min-width: 0; }
+.order-item-name { font-size: 13px; font-weight: 600; color: var(--plum); }
+.order-item-meta { font-size: 12px; color: var(--plum-muted); }
+
+.order-item-subtotal { font-family: 'Cormorant Garamond', serif; font-size: 15px; font-weight: 600; color: var(--plum); white-space: nowrap; }
+
+.order-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--blush-mid);
+}
+
+.order-total { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 600; color: var(--pink-deep); }
+
+.order-actions { display: flex; align-items: center; gap: 10px; }
+
+.order-status-select {
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--blush-deep);
+  background: var(--blush);
+  font-family: 'Manrope', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--plum);
+  cursor: pointer;
+}
+
+.order-delete-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--blush);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.3s var(--ease-soft);
+}
+
+.order-delete-btn:hover { background: var(--pink); }
+.order-delete-btn svg { width: 14px; height: 14px; stroke: var(--plum); fill: none; stroke-width: 1.7; }
+.order-delete-btn:hover svg { stroke: var(--white); }
+
+.orders-empty {
+  text-align: center;
+  padding: 90px 24px;
+  color: var(--plum-muted);
+}
+
+.orders-empty svg { width: 44px; height: 44px; stroke: var(--plum-faint); fill: none; stroke-width: 1.3; margin-bottom: 16px; }
+.orders-empty h3 { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 600; color: var(--plum); margin-bottom: 8px; }
+.orders-empty p { font-size: 13px; max-width: 320px; margin: 0 auto; line-height: 1.6; }
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .orders-page { padding: 32px 20px 64px; }
+  .order-card-header { flex-direction: column; gap: 8px; }
+  .order-card-footer { flex-direction: column; align-items: stretch; gap: 14px; }
+  .order-actions { justify-content: space-between; }
+}

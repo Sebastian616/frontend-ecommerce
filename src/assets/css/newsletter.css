@@ -1,0 +1,87 @@
+/* ═══════════════════════════════════════════════
+   NEWSLETTER — sección de suscripción
+   Requiere: base.css
+   ═══════════════════════════════════════════════ */
+
+.newsletter {
+  background: var(--plum);
+  min-height: 100vh;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.newsletter-bg-shape {
+  position: absolute;
+  width: 900px;
+  height: 900px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(226, 55, 137, 0.18) 0%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.newsletter-content { position: relative; z-index: 2; text-align: center; max-width: 620px; padding: 40px; }
+
+.newsletter-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(226, 55, 137, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 32px;
+}
+
+.newsletter-icon svg { width: 26px; height: 26px; stroke: var(--pink); fill: none; stroke-width: 1.6; }
+
+.newsletter-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(30px, 4vw, 50px);
+  font-weight: 600;
+  color: var(--white);
+  line-height: 1.15;
+  margin-bottom: 16px;
+}
+
+.newsletter-caption {
+  font-size: 14px;
+  font-weight: 300;
+  color: var(--plum-faint);
+  line-height: 1.7;
+  margin-bottom: 34px;
+}
+
+.newsletter-form {
+  display: flex;
+  gap: 10px;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.newsletter-form input {
+  flex: 1;
+  padding: 15px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--white);
+  font-family: 'Manrope', sans-serif;
+  font-size: 13px;
+}
+
+.newsletter-form input::placeholder { color: var(--plum-faint); }
+.newsletter-form input:focus { outline: 1px solid var(--pink); }
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .newsletter-content { padding: 24px; }
+  .newsletter-form { flex-direction: column; }
+}

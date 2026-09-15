@@ -1,0 +1,60 @@
+/* ═══════════════════════════════════════════════
+   CATEGORIES — fila de íconos de categorías
+   Requiere: base.css
+   ═══════════════════════════════════════════════ */
+
+.categories {
+  padding: 72px 64px 40px;
+}
+
+.categories-track {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.category-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  flex: 1 1 120px;
+}
+
+.category-circle {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: var(--blush-mid);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.4s var(--ease-soft), transform 0.4s var(--ease-soft);
+}
+
+.category-circle svg { width: 32px; height: 32px; stroke: var(--pink-deep); fill: none; stroke-width: 1.4; }
+
+.category-item:hover .category-circle { background: var(--pink); transform: translateY(-4px); }
+.category-item:hover .category-circle svg { stroke: var(--white); }
+
+.category-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--plum-soft);
+}
+
+/* ═══════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .categories { padding: 56px 40px 24px; }
+}
+
+@media (max-width: 768px) {
+  .categories { padding: 40px 24px 12px; }
+  .categories-track { gap: 16px; justify-content: flex-start; overflow-x: auto; }
+  .category-item { flex: 0 0 88px; }
+  .category-circle { width: 72px; height: 72px; }
+}
