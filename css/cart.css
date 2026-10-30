@@ -223,6 +223,8 @@
 
 /* ═══════════════════════════════════════════════
    TOAST DE CONFIRMACIÓN DE PEDIDO
+   (ya no lo usa cart.js: ahora la confirmación es un diálogo de SweetAlert2.
+   Puedes borrar este bloque cuando quieras.)
    ═══════════════════════════════════════════════ */
 .order-confirm-toast {
   position: fixed;
@@ -243,3 +245,92 @@
 }
 
 .order-confirm-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ═══════════════════════════════════════════════
+   SWEETALERT POR ENCIMA DEL CARRITO
+   El drawer usa z-index 2200 y SweetAlert 1060 por defecto: sin esto, los
+   avisos y diálogos que salen con el carrito abierto quedan escondidos detrás.
+   ═══════════════════════════════════════════════ */
+.swal2-container { z-index: 4000 !important; }
+
+/* ═══════════════════════════════════════════════
+   CAMIÓN DE ENVÍO GRATIS
+   --p (0 a 1) lo pone cart.js según subtotal / monto mínimo de envío gratis
+   ═══════════════════════════════════════════════ */
+.cart-ship {
+  padding: 14px 28px 16px;
+  border-bottom: 1px solid var(--blush-mid);
+}
+
+.ship-msg {
+  font-size: 13px;
+  text-align: center;
+  margin-bottom: 6px;
+  color: var(--plum);
+}
+
+.ship-msg b { color: var(--pink-deep); font-weight: 600; }
+
+.ship-track { position: relative; height: 42px; }
+
+.ship-road {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--blush-mid);
+  overflow: hidden;
+}
+
+.ship-road-fill {
+  height: 100%;
+  width: calc(var(--p) * 100%);
+  background: var(--pink);
+  transition: width 0.6s var(--ease-soft);
+}
+
+.ship-truck {
+  position: absolute;
+  bottom: 3px;
+  width: 48px;
+  left: calc(var(--p) * (100% - 48px));
+  transition: left 0.6s var(--ease-soft);
+}
+
+.ship-truck svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+.truck-cargo { fill: var(--white); stroke: var(--plum); stroke-width: 2; }
+
+.truck-fill {
+  fill: var(--pink);
+  transform-box: fill-box;
+  transform-origin: left center;
+  transform: scaleX(var(--p));
+  transition: transform 0.6s var(--ease-soft);
+}
+
+.truck-cab {
+  fill: var(--white);
+  stroke: var(--plum);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  transition: fill 0.6s var(--ease-soft);
+}
+
+.truck-wheel { fill: var(--plum); stroke: var(--white); stroke-width: 2; }
+
+/* Envío gratis alcanzado */
+.cart-ship.is-free .truck-cab { fill: var(--pink); }
+.cart-ship.is-free .ship-truck { animation: shipBounce 0.9s ease-in-out 2; }
+
+@keyframes shipBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ship-road-fill, .ship-truck, .truck-fill, .truck-cab { transition: none; }
+  .cart-ship.is-free .ship-truck { animation: none; }
+}

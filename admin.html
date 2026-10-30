@@ -80,6 +80,13 @@
     font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px;
     border: 1px solid var(--blush-mid, #f4e9ef); background: #fff;
   }
+  .admin-label-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .admin-mini-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .admin-mini-btn {
+    border: none; background: var(--blush-mid, #f4e9ef); color: var(--plum, #241233);
+    font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  }
+  .admin-mini-btn:hover { background: var(--pink, #e23789); color: #fff; }
 </style>
 </head>
 <body>
@@ -117,7 +124,10 @@
           <input type="number" id="fieldPrice" placeholder="89000" min="1" required>
         </div>
         <div class="admin-field">
-          <label for="fieldCategory">Categoría *</label>
+          <div class="admin-label-row">
+            <label for="fieldCategory">Categoría *</label>
+            <button type="button" id="addCategoryBtn" class="admin-mini-btn">+ Nueva</button>
+          </div>
           <select id="fieldCategory" required>
             <option value="">Cargando…</option>
           </select>
@@ -146,6 +156,10 @@
         <div id="existingVariants" class="admin-existing-variants"></div>
         <div id="variantRows" class="admin-variant-list"></div>
         <button type="button" id="addVariantBtn" class="admin-image-add">+ Agregar variante</button>
+        <div class="admin-mini-actions">
+          <button type="button" id="addColorBtn" class="admin-mini-btn">+ Nuevo color</button>
+          <button type="button" id="addSizeBtn" class="admin-mini-btn">+ Nueva talla</button>
+        </div>
         <div class="admin-field-hint">Sin variantes el cliente no podrá comprar el producto. El precio es opcional: si lo dejas vacío se usa el precio base.</div>
       </div>
 

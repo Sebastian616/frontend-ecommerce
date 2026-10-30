@@ -49,9 +49,23 @@ const Api = {
     return d.usuario;
   },
 
-  // ---- Catálogo
-  productos: (params = {}) => Api.request('/productos?' + new URLSearchParams(params)),
-  producto:  (id) => Api.request(`/productos/${id}`),
+  // ---- Catálogo (público)
+  productos:   (params = {}) => Api.request('/productos?' + new URLSearchParams(params)),
+  producto:    (id) => Api.request(`/productos/${id}`),
+  categorias:  () => Api.request('/categorias'),
+  colores:     () => Api.request('/colores'),
+  tallas:      () => Api.request('/tallas'),
+
+  // ---- Catálogo (admin)
+  adminProductos:     (params = {}) => Api.request('/admin/productos?' + new URLSearchParams(params)),
+  crearProducto:      (d)     => Api.request('/productos', { method: 'POST', body: d }),
+  actualizarProducto: (id, d) => Api.request(`/productos/${id}`, { method: 'PUT', body: d }),
+  crearVariante:      (productoId, d) =>
+    Api.request(`/productos/${productoId}/variantes`, { method: 'POST', body: d }),
+  actualizarVariante: (id, d) => Api.request(`/variantes/${id}`, { method: 'PUT', body: d }),
+  crearCategoria:    (d) => Api.request('/categorias', { method: 'POST', body: d }),
+  crearColor:        (d) => Api.request('/colores',    { method: 'POST', body: d }),
+  crearTalla:        (d) => Api.request('/tallas',     { method: 'POST', body: d }),
 
   // ---- Carrito
   carrito:        () => Api.request('/me/carrito'),
@@ -70,4 +84,9 @@ const Api = {
     Api.request('/ordenes', { method: 'POST', body: { direccionId, cuponCodigo, metodo } }),
   misOrdenes:     () => Api.request('/ordenes'),
   cancelarOrden:  (id) => Api.request(`/ordenes/${id}/cancelar`, { method: 'POST' }),
+
+  // ---- Admin: pedidos
+  ordenesAdmin:       () => Api.request('/ordenes?todas=1'),
+  cambiarEstadoOrden: (id, estado) => Api.request(`/ordenes/${id}/estado`, { method: 'PATCH', body: { estado } }),
+  confirmarPagoOrden: (id) => Api.request(`/ordenes/${id}/confirmar-pago`, { method: 'PATCH' }),
 };

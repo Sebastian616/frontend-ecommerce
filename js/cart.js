@@ -3,32 +3,30 @@
 // - El carrito vive en el servidor (/me/carrito), por usuario.
 // - Se agrega por VARIANTE (color + talla), no por producto.
 // - "Finalizar compra" crea una orden real (/ordenes). Sin pasarela de pago por ahora.
-// - RÁPIDO: cada operación usa la respuesta del servidor (sin pedir el carrito otra vez)
-//   y los cambios de cantidad / eliminar se ven al instante (optimistas).
 // Requiere cargar antes: SweetAlert2, config.js, api.js
 // ═══════════════════════════════════════════════
 
 const FREE_SHIPPING_MIN = 100000;
-const SHIPPING_COST = 10000; // Debe coincidir con COSTO_ENVIO / ENVIO_GRATIS_DESDE del backend (.env)
 
-// Campos de la nueva dirección (coinciden con lo que exige la API)
+// Campos del formulario de nueva dirección. Si tu API usa otros nombres, cámbialos aquí.
 const ADDRESS_FIELDS = [
-  { key: 'nombre',       label: 'Nombre de quien recibe',   required: true },
-  { key: 'telefono',     label: 'Teléfono',                 required: true, type: 'tel' },
-  { key: 'linea1',       label: 'Dirección (calle y número)', required: true },
-  { key: 'linea2',       label: 'Apto, barrio, referencias', required: false },
-  { key: 'ciudad',       label: 'Ciudad',                   required: true },
-  { key: 'departamento', label: 'Departamento',             required: true },
+  { key: 'nombre',       label: 'Nombre de quien recibe',          required: true },
+  { key: 'telefono',     label: 'Teléfono',                        required: true, type: 'tel' },
+  { key: 'direccion',    label: 'Dirección (calle, número, apto)', required: true },
+  { key: 'ciudad',       label: 'Ciudad',                          required: true },
+  { key: 'departamento', label: 'Departamento',                    required: false },
 ];
 
-// "TARJETA" queda visible pero deshabilitada hasta tener pasarela de pago.
+// Métodos de pago. "TARJETA" queda visible pero deshabilitada hasta tener pasarela:
+// cuando la implementes, pon enabled: true y agrega el valor al enum del backend.
 const PAYMENT_METHODS = [
-  { id: 'EFECTIVO',      label: 'Efectivo',      hint: 'Pagas al recibir tu pedido',          enabled: true  },
-  { id: 'TRANSFERENCIA', label: 'Transferencia', hint: 'Transfieres y confirmamos tu pedido', enabled: true  },
-  { id: 'TARJETA',       label: 'Tarjeta',       hint: 'Próximamente',                        enabled: false },
+  { id: 'EFECTIVO',      label: 'Efectivo',      hint: 'Pagas al recibir tu pedido',            enabled: true  },
+  { id: 'TRANSFERENCIA', label: 'Transferencia', hint: 'Transfieres y confirmamos tu pedido',   enabled: true  },
+  { id: 'TARJETA',       label: 'Tarjeta',       hint: 'Próximamente',                          enabled: false },
 ];
 
-// Datos para pagos por transferencia (los vacíos no se muestran)
+// Datos para pagos por transferencia. Completa los que quieras mostrar al cliente;
+// los que dejes vacíos no se muestran. Si todos están vacíos se avisa que se enviarán después.
 const TRANSFER_INFO = {
   banco: '',
   tipoCuenta: '',
@@ -37,6 +35,7 @@ const TRANSFER_INFO = {
   nota: '',   // ej: "Envíanos el comprobante por WhatsApp al 300 000 0000"
 };
 
+// Texto que ve el cliente al crear el pedido según el método
 const PAYMENT_INSTRUCTIONS = {
   EFECTIVO: 'Pagarás en efectivo cuando recibas tu pedido.',
   TRANSFERENCIA: 'Realiza la transferencia y usa tu número de pedido como referencia.',
@@ -50,6 +49,22 @@ const cartModalHTML = `
     <button class="cart-close" id="cartClose" aria-label="Cerrar carrito">
       <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
+  </div>
+
+  <div class="cart-ship" id="cartShip" style="--p:0">
+    <div class="ship-msg" id="cartShipMsg"></div>
+    <div class="ship-track">
+      <div class="ship-road"><div class="ship-road-fill"></div></div>
+      <div class="ship-truck">
+        <svg viewBox="0 0 64 40" aria-hidden="true">
+          <rect class="truck-cargo" x="2" y="5" width="38" height="24" rx="3"/>
+          <rect class="truck-fill" x="3" y="6" width="36" height="22" rx="2"/>
+          <path class="truck-cab" d="M42 12h11l9 10v7H42z"/>
+          <circle class="truck-wheel" cx="15" cy="32" r="5"/>
+          <circle class="truck-wheel" cx="50" cy="32" r="5"/>
+        </svg>
+      </div>
+    </div>
   </div>
 
   <div class="cart-items" id="cartItemsWrap"></div>
@@ -74,13 +89,28 @@ if (!document.getElementById('cartModal')) {
   document.body.insertAdjacentHTML('beforeend', cartModalHTML);
 }
 
-let cartItems = [];          // carrito normalizado (copia del servidor)
-let cartLoading = Api.isLogged(); // true hasta la primera respuesta
-let lastSync = 0;            // última vez que sincronizamos con el servidor
-let addBusy = false;         // evita doble clic al agregar
-let pending = 0;             // operaciones de cantidad/eliminar en curso
-let failed = false;
-let chain = Promise.resolve(); // cola: las operaciones se envían en orden
+// Camión: se llena y avanza según el subtotal; con FREE_SHIPPING_MIN el envío es gratis
+function updateShippingBar(subtotal) {
+  const ship = document.getElementById('cartShip');
+  const msg = document.getElementById('cartShipMsg');
+  if (!ship || !msg) return;
+
+  const p = Math.max(0, Math.min(1, subtotal / FREE_SHIPPING_MIN));
+  const free = subtotal >= FREE_SHIPPING_MIN;
+  ship.style.setProperty('--p', p);
+  ship.classList.toggle('is-free', free);
+
+  if (free) {
+    msg.innerHTML = '🎉 <b>¡Tu envío es gratis!</b>';
+  } else if (subtotal <= 0) {
+    msg.innerHTML = `Agrega productos y llega a <b>${formatPrice(FREE_SHIPPING_MIN)}</b> para envío gratis`;
+  } else {
+    msg.innerHTML = `Te faltan <b>${formatPrice(FREE_SHIPPING_MIN - subtotal)}</b> para el envío gratis`;
+  }
+}
+
+let cartItems = [];   // carrito normalizado (viene del servidor)
+let cartBusy = false; // evita dobles clics mientras hay una petición en curso
 
 // ═══════════════════════════════════════════════
 // HELPERS
@@ -144,80 +174,53 @@ function apiError(err, fallback) {
   console.error(err);
   if (err.status === 401) return askLogin();
   let msg = err.message || fallback;
-  if (err.details && typeof err.details === 'object') {
-    const lines = Array.isArray(err.details)
-      ? err.details.map((d) => (typeof d === 'string' ? d : d.message || JSON.stringify(d)))
-      : Object.entries(err.details).map(([k, v]) => `${k}: ${[].concat(v).join(', ')}`);
-    if (lines.length) msg += '\n' + lines.join('\n');
+  if (Array.isArray(err.details) && err.details.length) {
+    msg += '\n' + err.details.map((d) => {
+      if (typeof d === 'string') return d;
+      const path = Array.isArray(d.path) ? d.path.join('.') : '';
+      return (path ? path + ': ' : '') + (d.message || JSON.stringify(d));
+    }).join('\n');
   }
   return Swal.fire({ icon: 'error', title: fallback, text: msg, confirmButtonColor: '#E23789' });
 }
 
 // ═══════════════════════════════════════════════
-// ESTADO DEL CARRITO
-// El servidor ya manda precioUnitario / subtotal calculados: aquí NO se adivinan precios.
+// NORMALIZAR LA RESPUESTA DE /me/carrito
+// Si tu API devuelve otra forma, ajusta SOLO esta función.
+// Se espera algo como: { items: [{ cantidad, variante: { id, stock, precio, color, talla, producto } }] }
 // ═══════════════════════════════════════════════
 
 function normalizeCart(data) {
-  const raw = Array.isArray(data) ? data : (data?.items || []);
+  const raw = Array.isArray(data) ? data : (data?.items || data?.lineas || []);
   return raw.map((it) => {
-    const v = it.variante || {};
-    const prod = v.producto || {};
+    const v = it.variante || it;
+    const prod = v.producto || it.producto || {};
     const imgs = Array.isArray(prod.imagenes) ? prod.imagenes : [];
     const first = imgs[0];
     return {
-      id: it.varianteId ?? v.id,                         // id de la VARIANTE
-      name: prod.nombre || 'Producto',
+      id: it.varianteId ?? v.id,                       // id de la VARIANTE
+      name: prod.nombre || it.nombre || 'Producto',
       image: typeof first === 'string' ? first : (first?.url || ''),
       variant: [v.color?.nombre, v.talla?.nombre].filter(Boolean).join(' / '),
-      price: Number(it.precioUnitario ?? v.precio ?? prod.precioBase ?? 0),
-      qty: Number(it.cantidad ?? 1),
+      price: Number(v.precio ?? it.precioUnitario ?? it.precio ?? prod.precioBase ?? 0),
+      qty: Number(it.cantidad ?? it.qty ?? 1),
       stock: v.stock ?? null,
     };
   });
 }
 
-function applyCart(data) {
-  cartItems = normalizeCart(data);
-  cartLoading = false;
-  lastSync = Date.now();
-  renderCart();
-}
-
 async function refreshCart() {
   if (!Api.isLogged()) {
     cartItems = [];
-    cartLoading = false;
-    renderCart();
-    return;
-  }
-  try {
-    applyCart(await Api.carrito());
-  } catch (err) {
-    console.warn('No se pudo cargar el carrito', err);
-    if (err.status === 401) cartItems = [];
-    cartLoading = false;
-    renderCart();
-  }
-}
-
-// Envía una operación al servidor SIN bloquear la pantalla.
-// Van en cola (en orden) y solo la última aplica la respuesta del servidor.
-function syncOp(requestFn, errorMsg) {
-  pending++;
-  chain = chain.then(async () => {
+  } else {
     try {
-      const data = await requestFn();
-      if (pending === 1) applyCart(data);
+      cartItems = normalizeCart(await Api.carrito());
     } catch (err) {
-      failed = true;
-      apiError(err, errorMsg);
-    } finally {
-      pending--;
-      if (pending === 0 && failed) { failed = false; await refreshCart(); } // vuelve a la verdad del servidor
+      console.warn('No se pudo cargar el carrito', err);
+      if (err.status === 401) cartItems = [];
     }
-  });
-  return chain;
+  }
+  renderCart();
 }
 
 // ═══════════════════════════════════════════════
@@ -248,9 +251,7 @@ function renderCart() {
   const wrap = document.getElementById('cartItemsWrap');
   if (!wrap) return;
 
-  if (cartLoading && cartItems.length === 0) {
-    wrap.innerHTML = `<div class="cart-empty"><p>Cargando tu carrito…</p></div>`;
-  } else if (cartItems.length === 0) {
+  if (cartItems.length === 0) {
     const msg = Api.isLogged() ? 'Tu carrito está vacío' : 'Inicia sesión para ver tu carrito';
     wrap.innerHTML = `
       <div class="cart-empty">
@@ -269,29 +270,13 @@ function renderCart() {
   const subEl = document.querySelector('.cart-subtotal-value');
   if (countEl) countEl.textContent = `(${totalQty})`;
   if (subEl) subEl.textContent = formatPrice(subtotal);
+  updateShippingBar(subtotal);
 }
 
 // ═══════════════════════════════════════════════
-// AGREGAR AL CARRITO
+// AGREGAR AL CARRITO (por producto → se elige variante)
+// Cualquier botón con class "product-cart-btn" y data-product-id sirve.
 // ═══════════════════════════════════════════════
-
-// Agrega una variante ya elegida (la usa products.js). Una sola petición.
-async function addVariantToCart(varianteId, productName = 'Producto') {
-  if (!Api.isLogged()) return askLogin();
-  if (addBusy) return;
-  addBusy = true;
-  try {
-    const data = await Api.agregarAlCarrito(Number(varianteId), 1);
-    if (pending === 0) applyCart(data);
-    else { await chain; await refreshCart(); }
-    bumpCartBadge();
-    toast('success', `${productName} agregado`, 'Se sumó al carrito correctamente');
-  } catch (err) {
-    apiError(err, 'No se pudo agregar al carrito');
-  } finally {
-    addBusy = false;
-  }
-}
 
 function variantLabel(v) {
   const base = [v.color?.nombre, v.talla?.nombre].filter(Boolean).join(' / ') || v.sku;
@@ -315,29 +300,81 @@ async function pickVariant(product, variants) {
   return isConfirmed ? variants.find((v) => String(v.id) === String(value)) : null;
 }
 
-// Para botones con data-product-id (páginas que no tienen las variantes cargadas)
 async function addProductToCart(productId) {
   if (!Api.isLogged()) return askLogin();
-  if (addBusy) return;
+  if (cartBusy) return;
+  cartBusy = true;
   try {
     const product = await Api.producto(productId);
     const variants = (product.variantes || []).filter((v) => v.stock > 0);
+
     if (variants.length === 0) {
       Swal.fire({ icon: 'info', title: 'Agotado', text: 'Este producto no tiene stock por ahora.', confirmButtonColor: '#E23789' });
       return;
     }
+
     const variant = variants.length === 1 ? variants[0] : await pickVariant(product, variants);
-    if (variant) await addVariantToCart(variant.id, product.nombre);
+    if (!variant) return;
+
+    await Api.agregarAlCarrito(variant.id, 1);
+    await refreshCart();
+    bumpCartBadge();
+    toast('success', `${product.nombre} agregado`, 'Se sumó al carrito correctamente');
   } catch (err) {
     apiError(err, 'No se pudo agregar al carrito');
+  } finally {
+    cartBusy = false;
+  }
+}
+
+// Agrega una variante ya elegida (la usan páginas con su propio selector, como productos.html).
+// Formas admitidas: addVariantToCart(varianteId, cantidad) | addVariantToCart(variante, cantidad)
+//                   | addVariantToCart(producto, variante, cantidad)
+async function addVariantToCart(a, b, c) {
+  let varianteId;
+  let cantidad = 1;
+  let nombre = '';
+
+  if (a && typeof a === 'object' && Array.isArray(a.variantes) && b && typeof b === 'object') {
+    nombre = a.nombre || '';
+    varianteId = b.id;
+    cantidad = Number(c) || 1;
+  } else if (a && typeof a === 'object') {
+    varianteId = a.id;
+    cantidad = Number(b) || 1;
+  } else {
+    varianteId = a;
+    cantidad = Number(b) || 1;
+  }
+
+  if (!Number.isInteger(Number(varianteId)) || Number(varianteId) <= 0) {
+    console.error('addVariantToCart: no llegó un id de variante válido', { a, b, c });
+    return apiError(new Error('No se pudo identificar la variante seleccionada'), 'No se pudo agregar al carrito');
+  }
+  if (!Api.isLogged()) return askLogin();
+  if (cartBusy) return false;
+
+  cartBusy = true;
+  try {
+    await Api.agregarAlCarrito(Number(varianteId), Math.max(1, Math.floor(cantidad)));
+    await refreshCart();
+    bumpCartBadge();
+    toast('success', nombre ? `${nombre} agregado` : 'Producto agregado', 'Se sumó al carrito correctamente');
+    return true;
+  } catch (err) {
+    apiError(err, 'No se pudo agregar al carrito');
+    return false;
+  } finally {
+    cartBusy = false;
   }
 }
 
 // ═══════════════════════════════════════════════
-// CAMBIAR CANTIDAD / ELIMINAR  (se ven al instante)
+// CAMBIAR CANTIDAD / ELIMINAR
 // ═══════════════════════════════════════════════
 
-function changeQty(id, delta) {
+async function changeQty(id, delta) {
+  if (cartBusy) return;
   const item = cartItems.find((i) => String(i.id) === String(id));
   if (!item) return;
 
@@ -348,15 +385,30 @@ function changeQty(id, delta) {
     return;
   }
 
-  item.qty = next;   // cambio inmediato en pantalla
-  renderCart();
-  syncOp(() => Api.cambiarCantidad(item.id, next), 'No se pudo cambiar la cantidad');
+  cartBusy = true;
+  try {
+    await Api.cambiarCantidad(item.id, next);
+    await refreshCart();
+  } catch (err) {
+    apiError(err, 'No se pudo cambiar la cantidad');
+    await refreshCart();
+  } finally {
+    cartBusy = false;
+  }
 }
 
-function removeItem(id) {
-  cartItems = cartItems.filter((i) => String(i.id) !== String(id)); // desaparece ya
-  renderCart();
-  syncOp(() => Api.quitarDelCarrito(id), 'No se pudo quitar el producto');
+async function removeItem(id) {
+  if (cartBusy) return;
+  cartBusy = true;
+  try {
+    await Api.quitarDelCarrito(id);
+    await refreshCart();
+  } catch (err) {
+    apiError(err, 'No se pudo quitar el producto');
+    await refreshCart();
+  } finally {
+    cartBusy = false;
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -394,7 +446,8 @@ function paymentInstructionsHTML(method) {
 }
 
 function addressLabel(d) {
-  return [d.linea1, d.ciudad].filter(Boolean).join(', ') || `Dirección #${d.id}`;
+  const main = d.direccion || d.linea1 || d.calle || '';
+  return [main, d.ciudad].filter(Boolean).join(', ') || `Dirección #${d.id}`;
 }
 
 async function createAddressFlow() {
@@ -421,44 +474,43 @@ async function createAddressFlow() {
       try {
         return await Api.crearDireccion(data);
       } catch (err) {
-        Swal.showValidationMessage(err.message || 'No se pudo guardar la dirección');
+        let msg = err.message || 'No se pudo guardar la dirección';
+        if (Array.isArray(err.details) && err.details.length) {
+          msg += ': ' + err.details.map((d) => d.message || d).join(', ');
+        }
+        Swal.showValidationMessage(msg);
         return false;
       }
     },
   });
   if (!res.isConfirmed) return null;
-  return res.value?.id ?? null;
+  return res.value?.id ?? res.value?.direccion?.id ?? null;
 }
 
 async function handleCheckout() {
   if (!Api.isLogged()) return askLogin();
-  await chain;                       // espera cambios de cantidad pendientes
   if (cartItems.length === 0) return;
+  if (cartBusy) return;
 
-  closeCart();
+  closeCart(); // para que los diálogos se vean por encima
 
   let addresses = [];
   try {
     const d = await Api.direcciones();
-    addresses = Array.isArray(d) ? d : (d?.data || []);
+    addresses = Array.isArray(d) ? d : (d?.data || d?.direcciones || []);
   } catch (err) {
     return apiError(err, 'No se pudieron cargar tus direcciones');
   }
 
   const subtotal = cartItems.reduce((s, i) => s + i.qty * i.price, 0);
   const totalQty = cartItems.reduce((s, i) => s + i.qty, 0);
-  const shipping = subtotal >= FREE_SHIPPING_MIN ? 0 : SHIPPING_COST;
   const selectStyle = 'width:100%;box-sizing:border-box;margin:6px 0;padding:10px;border-radius:10px;border:1px solid #ddd;font:inherit';
 
   const step = await Swal.fire({
     title: 'Confirmar pedido',
     html: `
-      <div style="text-align:left;margin:0 0 12px;line-height:1.7">
-        <div>${totalQty} ${totalQty === 1 ? 'producto' : 'productos'} · Subtotal: <b>${formatPrice(subtotal)}</b></div>
-        <div>Envío: <b>${shipping === 0 ? 'Gratis 🎉' : formatPrice(shipping)}</b></div>
-        <div>Total estimado: <b>${formatPrice(subtotal + shipping)}</b></div>
-        <small>Si usas un cupón, el descuento se aplica al confirmar.</small>
-      </div>
+      <p style="margin:0 0 12px">${totalQty} ${totalQty === 1 ? 'producto' : 'productos'} · <b>${formatPrice(subtotal)}</b>
+      ${subtotal >= FREE_SHIPPING_MIN ? '<br><small>Envío gratis 🎉</small>' : ''}</p>
       <select id="swAddress" style="${selectStyle}">
         ${addresses.map((a) => `<option value="${esc(a.id)}">${esc(addressLabel(a))}</option>`).join('')}
         <option value="new">+ Nueva dirección</option>
@@ -490,34 +542,29 @@ async function handleCheckout() {
     if (!direccionId) return;
   }
 
+  cartBusy = true;
   Swal.fire({ title: 'Creando tu pedido…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
   try {
     const orden = await Api.crearOrden(Number(direccionId), step.value.code || undefined, step.value.pay);
-    cartItems = [];            // la orden vació el carrito en el servidor
-    renderCart();
+    await refreshCart();
 
-    const num = (x) => Number(x || 0);
-    const resumen = `
-      <div style="text-align:left;margin-top:8px;line-height:1.7">
-        <div>Subtotal: ${formatPrice(num(orden.subtotal))}</div>
-        ${num(orden.descuento) > 0 ? `<div>Descuento: −${formatPrice(num(orden.descuento))}</div>` : ''}
-        <div>Envío: ${num(orden.envio) === 0 ? 'Gratis' : formatPrice(num(orden.envio))}</div>
-        <div>Total: <b>${formatPrice(num(orden.total))}</b></div>
-      </div>`;
-
+    const ordenId = orden?.id ?? orden?.numero ?? '';
+    const ordenTotal = orden?.total != null ? ` · Total: <b>${formatPrice(Number(orden.total))}</b>` : '';
     const r = await Swal.fire({
       icon: 'success',
       title: '¡Pedido creado!',
-      html: `Número de pedido: <b>${esc(orden.numero ?? '#' + orden.id)}</b>${resumen}${paymentInstructionsHTML(step.value.pay)}`,
+      html: `Número de pedido: <b>#${esc(ordenId)}</b>${ordenTotal}${paymentInstructionsHTML(step.value.pay)}`,
       showCancelButton: true,
       confirmButtonText: 'Ver mis pedidos',
       cancelButtonText: 'Seguir comprando',
       confirmButtonColor: '#E23789',
     });
-    if (r.isConfirmed) location.href = 'mis-pedidos.html';
+    if (r.isConfirmed) location.href = 'pedidos.html';
   } catch (err) {
     await apiError(err, 'No se pudo crear el pedido');
     await refreshCart();
+  } finally {
+    cartBusy = false;
   }
 }
 
@@ -526,18 +573,18 @@ async function handleCheckout() {
 // ═══════════════════════════════════════════════
 
 document.addEventListener('click', (e) => {
-  if (e.target.closest('.cart-open-btn')) {
-    openCart();
-    if (Date.now() - lastSync > 30000) refreshCart(); // solo si los datos están viejos
-    return;
-  }
+  if (e.target.closest('.cart-open-btn')) { openCart(); refreshCart(); return; }
   if (e.target.closest('#cartClose')) { closeCart(); return; }
   if (e.target.closest('#cartOverlay')) { closeCart(); return; }
   if (e.target.closest('#cartContinue')) { closeCart(); return; }
   if (e.target.closest('#cartCheckoutBtn')) { handleCheckout(); return; }
 
-  const addBtn = e.target.closest('.product-cart-btn[data-product-id]');
-  if (addBtn) { addProductToCart(addBtn.dataset.productId); return; }
+  const addBtn = e.target.closest('.product-cart-btn');
+  if (addBtn) {
+    const productId = addBtn.dataset.productId;
+    if (productId) addProductToCart(productId);
+    return;
+  }
 
   const qtyBtn = e.target.closest('.qty-btn');
   if (qtyBtn) {
@@ -550,9 +597,8 @@ document.addEventListener('click', (e) => {
   const removeBtn = e.target.closest('.cart-item-remove');
   if (removeBtn) {
     const itemEl = removeBtn.closest('.cart-item');
-    const id = itemEl.dataset.id;
     itemEl.classList.add('removing');
-    setTimeout(() => removeItem(id), 180);
+    setTimeout(() => removeItem(itemEl.dataset.id), 300);
   }
 });
 
@@ -562,9 +608,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-window.addEventListener('cart:updated', () => refreshCart());
-
-// Disponibles para otras páginas
+// Disponibles para otras páginas (productos.html, login, etc.)
 window.refreshCart = refreshCart;
 window.addProductToCart = addProductToCart;
 window.addVariantToCart = addVariantToCart;

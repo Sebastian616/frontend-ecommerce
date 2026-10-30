@@ -6,14 +6,16 @@
 <title>Pedidos — Panel Orbisa</title>
 
 <!-- ═══════ GUARDIA DE ACCESO ═══════
-     Se ejecuta ANTES de cargar cualquier otra cosa. Si no hay
-     sesión de admin activa, redirige a login.html de inmediato. -->
+     Se ejecuta ANTES de cargar cualquier otra cosa. Si no hay sesión de admin
+     (o no hay token de la API), redirige de inmediato. La seguridad real está
+     en el backend: solo el rol ADMIN puede ver todos los pedidos. -->
 <script>
 (function () {
   try {
+    var token = localStorage.getItem('orbisa_token');
     var raw = localStorage.getItem('orbisa_session');
     var session = raw ? JSON.parse(raw) : null;
-    if (!session) {
+    if (!token || !session) {
       location.replace('login.html');
     } else if (session.role !== 'admin') {
       location.replace('index.html');
@@ -48,6 +50,10 @@
   </div>
 </div>
 
+<!-- el orden importa: config → api → auth → adminNav → pedidos -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="./js/config.js"></script>
+<script src="./js/api.js"></script>
 <script src="./js/auth.js"></script>
 <script src="./js/adminNav.js"></script>
 <script src="./js/pedidos.js"></script>

@@ -95,22 +95,24 @@ function normalizeProduct(p) {
 }
 
 function categoryName(id) {
-  const find = (list) => {
-    for (const c of list) {
-      if (c.id === id) return c.nombre;
-      const inner = c.hijas && find(c.hijas);
-      if (inner) return inner;
-    }
-    return null;
-  };
-  return find(categorias);
+  return categorias.find((c) => c.id === id)?.nombre || null;
 }
 
-function flattenCategories(list, depth = 0) {
-  return list.flatMap((c) => [
-    { id: c.id, label: '— '.repeat(depth) + c.nombre },
-    ...flattenCategories(c.hijas || [], depth + 1),
-  ]);
+// Arma el listado indentado a partir de la lista plana (usa padreId, sin límite de niveles)
+function categoryOptions() {
+  const byParent = new Map();
+  categorias.forEach((c) => {
+    const k = c.padreId ?? 0;
+    if (!byParent.has(k)) byParent.set(k, []);
+    byParent.get(k).push(c);
+  });
+  const out = [];
+  const walk = (parent, depth) => (byParent.get(parent) || []).forEach((c) => {
+    out.push({ id: c.id, label: '— '.repeat(depth) + c.nombre });
+    walk(c.id, depth + 1);
+  });
+  walk(0, 0);
+  return out;
 }
 
 // ═══════════════════════════════════════════════
@@ -126,12 +128,15 @@ async function loadLookups() {
     handleApiError(err, 'No se pudieron cargar categorías, colores y tallas');
   }
 
+  renderCategorySelect();
+}
+
+function renderCategorySelect(selectedId) {
   const sel = document.getElementById('fieldCategory');
-  // /categorias devuelve todas (raíces e hijas) con sus hijas anidadas: partimos de las raíces
-  const roots = categorias.filter((c) => !c.padreId);
-  const flat = flattenCategories(roots.length ? roots : categorias);
+  const current = selectedId ?? sel.value;
   sel.innerHTML = '<option value="">Selecciona…</option>' +
-    flat.map((c) => `<option value="${esc(c.id)}">${esc(c.label)}</option>`).join('');
+    categoryOptions().map((c) => `<option value="${esc(c.id)}">${esc(c.label)}</option>`).join('');
+  if (current) sel.value = String(current);
 }
 
 async function loadProducts(p = page) {
@@ -479,6 +484,156 @@ async function handleSubmit(e) {
 }
 
 // ═══════════════════════════════════════════════
+// CREAR CATEGORÍAS, COLORES Y TALLAS
+// ═══════════════════════════════════════════════
+
+const DIALOG_INPUT = 'width:100%;box-sizing:border-box;margin:6px 0;padding:10px;border-radius:10px;border:1px solid #ddd;font:inherit';
+
+// Error dentro de un diálogo: sesión/permisos se manejan como siempre; el resto se muestra en el propio diálogo
+function dialogFail(err, fallback) {
+  if (err.status === 401 || err.status === 403) {
+    Swal.close();
+    handleApiError(err, fallback);
+    return false;
+  }
+  let msg = err.message || fallback;
+  if (Array.isArray(err.details) && err.details.length) {
+    msg += ': ' + err.details.map((d) => (typeof d === 'string' ? d : d.message || JSON.stringify(d))).join(', ');
+  }
+  Swal.showValidationMessage(msg);
+  return false;
+}
+
+const norm = (t) => String(t).trim().toLowerCase();
+
+function dialogBase(title, html, confirmText) {
+  return {
+    title, html,
+    showCancelButton: true,
+    confirmButtonText: confirmText,
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#e23789',
+    focusConfirm: false,
+  };
+}
+
+async function createCategoryFlow() {
+  const opts = categoryOptions();
+  const res = await Swal.fire({
+    ...dialogBase('Nueva categoría', `
+      <input id="swCatName" class="swal2-input" placeholder="Nombre (ej: Leggings) *" style="${DIALOG_INPUT}">
+      <input id="swCatSlug" class="swal2-input" placeholder="Slug (url)" style="${DIALOG_INPUT}">
+      <select id="swCatParent" style="${DIALOG_INPUT}">
+        <option value="">Sin categoría padre</option>
+        ${opts.map((o) => `<option value="${esc(o.id)}">${esc(o.label)}</option>`).join('')}
+      </select>`, 'Crear categoría'),
+    didOpen: () => {
+      const n = document.getElementById('swCatName');
+      const sl = document.getElementById('swCatSlug');
+      let touched = false;
+      n.addEventListener('input', () => { if (!touched) sl.value = slugify(n.value); });
+      sl.addEventListener('input', () => { touched = true; });
+      n.focus();
+    },
+    preConfirm: async () => {
+      const nombre = document.getElementById('swCatName').value.trim();
+      const slug = slugify(document.getElementById('swCatSlug').value) || slugify(nombre);
+      const padre = document.getElementById('swCatParent').value;
+      if (!nombre) { Swal.showValidationMessage('Escribe el nombre de la categoría'); return false; }
+      if (categorias.some((c) => c.slug === slug)) {
+        Swal.showValidationMessage('Ya existe una categoría con ese slug'); return false;
+      }
+      try {
+        return await Api.crearCategoria({ nombre, slug, ...(padre ? { padreId: Number(padre) } : {}) });
+      } catch (err) { return dialogFail(err, 'No se pudo crear la categoría'); }
+    },
+  });
+  if (!res.isConfirmed) return;
+
+  try { categorias = await Api.categorias(); } catch (e) { categorias.push(res.value); }
+  renderCategorySelect(res.value.id); // la deja seleccionada en el formulario
+  showToast('Categoría creada');
+}
+
+async function createColorFlow() {
+  const res = await Swal.fire({
+    ...dialogBase('Nuevo color', `
+      <input id="swColorName" class="swal2-input" placeholder="Nombre (ej: Rosa palo) *" style="${DIALOG_INPUT}">
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px">
+        <label for="swColorHex" style="font-size:14px">Tono</label>
+        <input id="swColorHex" type="color" value="#e23789" style="width:60px;height:40px;border:none;background:none;padding:0;cursor:pointer">
+      </div>`, 'Crear color'),
+    didOpen: () => document.getElementById('swColorName').focus(),
+    preConfirm: async () => {
+      const nombre = document.getElementById('swColorName').value.trim();
+      const hex = document.getElementById('swColorHex').value;
+      if (!nombre) { Swal.showValidationMessage('Escribe el nombre del color'); return false; }
+      if (colores.some((c) => norm(c.nombre) === norm(nombre))) {
+        Swal.showValidationMessage('Ya existe un color con ese nombre'); return false;
+      }
+      try {
+        return await Api.crearColor({ nombre, hex });
+      } catch (err) { return dialogFail(err, 'No se pudo crear el color'); }
+    },
+  });
+  if (!res.isConfirmed) return;
+
+  try { colores = await Api.colores(); } catch (e) { colores.push(res.value); }
+  refreshVariantSelects({ colorId: res.value.id });
+  showToast('Color creado');
+}
+
+async function createSizeFlow() {
+  const nextOrden = tallas.reduce((m, t) => Math.max(m, Number(t.orden) || 0), 0) + 1;
+  const res = await Swal.fire({
+    ...dialogBase('Nueva talla', `
+      <input id="swSizeName" class="swal2-input" placeholder="Nombre (ej: XL, 38, Única) *" style="${DIALOG_INPUT}">
+      <input id="swSizeOrder" class="swal2-input" type="number" min="0" step="1" value="${nextOrden}" style="${DIALOG_INPUT}">
+      <small style="opacity:.7">El orden define la posición en la lista (XS = 1, S = 2, M = 3…)</small>`, 'Crear talla'),
+    didOpen: () => document.getElementById('swSizeName').focus(),
+    preConfirm: async () => {
+      const nombre = document.getElementById('swSizeName').value.trim();
+      const orden = parseInt(document.getElementById('swSizeOrder').value, 10);
+      if (!nombre) { Swal.showValidationMessage('Escribe el nombre de la talla'); return false; }
+      if (!Number.isInteger(orden) || orden < 0) {
+        Swal.showValidationMessage('El orden debe ser un número entero'); return false;
+      }
+      if (tallas.some((t) => norm(t.nombre) === norm(nombre))) {
+        Swal.showValidationMessage('Ya existe una talla con ese nombre'); return false;
+      }
+      try {
+        return await Api.crearTalla({ nombre, orden });
+      } catch (err) { return dialogFail(err, 'No se pudo crear la talla'); }
+    },
+  });
+  if (!res.isConfirmed) return;
+
+  try { tallas = await Api.tallas(); } catch (e) { tallas.push(res.value); }
+  refreshVariantSelects({ tallaId: res.value.id });
+  showToast('Talla creada');
+}
+
+// Vuelve a llenar los desplegables de las filas de variantes ya abiertas, conservando lo elegido.
+// Si se pasa colorId/tallaId, lo selecciona en la última fila cuando esa casilla está vacía.
+function refreshVariantSelects(pick = {}) {
+  const rows = Array.from(document.querySelectorAll('#variantRows .admin-variant-row'));
+  rows.forEach((row) => {
+    const c = row.querySelector('.v-color');
+    const t = row.querySelector('.v-talla');
+    const cv = c.value;
+    const tv = t.value;
+    c.innerHTML = optionsHtml(colores, 'Color');
+    t.innerHTML = optionsHtml(tallas, 'Talla');
+    c.value = cv;
+    t.value = tv;
+  });
+  const last = rows[rows.length - 1];
+  if (!last) return;
+  if (pick.colorId && !last.querySelector('.v-color').value) last.querySelector('.v-color').value = String(pick.colorId);
+  if (pick.tallaId && !last.querySelector('.v-talla').value) last.querySelector('.v-talla').value = String(pick.tallaId);
+}
+
+// ═══════════════════════════════════════════════
 // EVENTOS
 // ═══════════════════════════════════════════════
 
@@ -513,6 +668,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btn = e.target.closest('button[data-page]');
     if (btn && !btn.disabled) loadProducts(Number(btn.dataset.page));
   });
+
+  document.getElementById('addCategoryBtn').addEventListener('click', createCategoryFlow);
+  document.getElementById('addColorBtn').addEventListener('click', createColorFlow);
+  document.getElementById('addSizeBtn').addEventListener('click', createSizeFlow);
 
   await loadLookups();
   await loadProducts(1);
