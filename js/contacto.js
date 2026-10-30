@@ -2,11 +2,7 @@
 // OrbIsa — Formulario de contacto (conectado a Formspree)
 // ═══════════════════════════════════════════════
 
-// 👇👇👇 REEMPLAZA ESTO con tu endpoint real de Formspree 👇👇👇
-// Lo encuentras en tu dashboard de Formspree, tiene esta forma:
-// https://formspree.io/f/xxxxxxxx
 const FORMSPREE_ENDPOINT = 'https://formspree.io/f/xqpkbybn';
-// 👆👆👆 REEMPLAZA ESTO con tu endpoint real de Formspree 👆👆👆
 
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('contactForm');

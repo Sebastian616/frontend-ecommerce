@@ -29,8 +29,8 @@
     <!-- ═══════ LOGIN ═══════ -->
     <form class="auth-form active" id="loginForm">
       <div class="auth-field">
-        <label for="loginUsername">Usuario o correo</label>
-        <input type="text" id="loginUsername" autocomplete="username" required>
+        <label for="loginUsername">Correo</label>
+        <input type="email" id="loginUsername" autocomplete="email" required>
       </div>
       <div class="auth-field">
         <label for="loginPassword">Contraseña</label>
@@ -43,19 +43,19 @@
     <form class="auth-form" id="registerForm">
       <div class="auth-field">
         <label for="registerName">Nombre</label>
-        <input type="text" id="registerName" autocomplete="name" required>
+        <input type="text" id="registerName" autocomplete="name" minlength="2" required>
       </div>
       <div class="auth-field">
         <label for="registerEmail">Correo</label>
         <input type="email" id="registerEmail" autocomplete="email" required>
       </div>
       <div class="auth-field">
-        <label for="registerPassword">Contraseña</label>
-        <input type="password" id="registerPassword" autocomplete="new-password" minlength="6" required>
+        <label for="registerPassword">Contraseña (mínimo 8 caracteres)</label>
+        <input type="password" id="registerPassword" autocomplete="new-password" minlength="8" required>
       </div>
       <div class="auth-field">
         <label for="registerConfirm">Confirmar contraseña</label>
-        <input type="password" id="registerConfirm" autocomplete="new-password" minlength="6" required>
+        <input type="password" id="registerConfirm" autocomplete="new-password" minlength="8" required>
       </div>
       <button type="submit" class="btn-pill auth-submit">Crear cuenta</button>
     </form>
@@ -64,6 +64,8 @@
   </div>
 </div>
 
+<script src="./js/config.js"></script>
+<script src="./js/api.js"></script>
 <script src="./js/auth.js"></script>
 <script src="./js/login.js"></script>
 </body>

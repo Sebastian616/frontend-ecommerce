@@ -1,53 +1,39 @@
 // ═══════════════════════════════════════════════
 // OrbIsa — Panel de administración de productos
-// Lee y escribe en la MISMA clave de localStorage
-// que consume productos.html (js/product.js):
-// 'orbisa_products'
+// Conectado a la API (catalogo.js). Requiere: config.js, api.js
 // ═══════════════════════════════════════════════
 
-const ADMIN_PRODUCTS_KEY = 'orbisa_products';
+const PAGE_LIMIT = 20;
 
-let editingId = null; // null = creando nuevo, string = editando ese id
+let editingId = null;
+let productsCache = [];
+let categorias = [];
+let colores = [];
+let tallas = [];
+let page = 1;
+let total = 0;
+let statusFilter = '';   // '' = todos, 'true' = activos, 'false' = desactivados
+let isSaving = false;
+let slugTouched = false;
 
-// ── Helpers (nombres únicos para no chocar con cart.js si algún día
-//    se cargan juntos en la misma página) ──
-function adminLoadProducts() {
-  try {
-    const raw = localStorage.getItem(ADMIN_PRODUCTS_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    console.warn('No se pudo leer el catálogo guardado.', e);
-    return [];
-  }
+// ═══════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════
+
+function esc(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-function adminSaveProducts(products) {
-  try {
-    localStorage.setItem(ADMIN_PRODUCTS_KEY, JSON.stringify(products));
-  } catch (e) {
-    console.warn('No se pudo guardar el catálogo.', e);
-  }
-}
-
-function adminSlugify(text) {
-  return String(text)
-    .toLowerCase()
+function slugify(text) {
+  return String(text).toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
+    .replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
-function adminFormatPrice(n) {
+function formatPrice(n) {
   return '$' + Number(n).toLocaleString('es-CO') + ' COP';
-}
-
-// Devuelve siempre un array de fotos, sin importar si el producto
-// se guardó con "images" (array nuevo) o con el "image" (string viejo).
-function adminGetProductImages(p) {
-  if (Array.isArray(p.images) && p.images.length) return p.images;
-  if (p.image) return [p.image];
-  return [];
 }
 
 function showToast(message) {
@@ -59,8 +45,119 @@ function showToast(message) {
   showToast._t = setTimeout(() => toast.classList.remove('show'), 2200);
 }
 
+function handleApiError(err, fallback) {
+  console.error(err);
+  if (err.status === 401) {
+    // Limpiamos también la sesión local para que login.html no nos devuelva aquí en bucle
+    localStorage.removeItem('orbisa_session');
+    Swal.fire({ icon: 'warning', title: 'Sesión vencida', text: 'Inicia sesión de nuevo.' })
+      .then(() => location.replace('login.html'));
+    return;
+  }
+  if (err.status === 403) {
+    Swal.fire({ icon: 'error', title: 'Sin permisos', text: 'Tu cuenta no puede administrar productos.' })
+      .then(() => location.replace('index.html'));
+    return;
+  }
+  let msg = err.message || fallback;
+  if (Array.isArray(err.details) && err.details.length) {
+    msg += '\n' + err.details.map((d) => {
+      if (typeof d === 'string') return d;
+      const path = Array.isArray(d.path) ? d.path.join('.') : '';
+      return (path ? path + ': ' : '') + (d.message || JSON.stringify(d));
+    }).join('\n');
+  }
+  Swal.fire({ icon: 'error', title: fallback, text: msg });
+}
+
+function confirmDialog(title, text, confirmText) {
+  return Swal.fire({
+    title, text, icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: confirmText,
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#e23789',
+  }).then((r) => r.isConfirmed);
+}
+
+function normalizeProduct(p) {
+  return {
+    id: p.id,
+    name: p.nombre,
+    slug: p.slug,
+    description: p.descripcion || '',
+    price: Number(p.precioBase),          // Prisma Decimal llega como string
+    categoriaId: p.categoriaId,
+    activo: p.activo !== false,
+    images: Array.isArray(p.imagenes) ? p.imagenes : [],
+    variantes: Array.isArray(p.variantes) ? p.variantes : [],
+  };
+}
+
+function categoryName(id) {
+  const find = (list) => {
+    for (const c of list) {
+      if (c.id === id) return c.nombre;
+      const inner = c.hijas && find(c.hijas);
+      if (inner) return inner;
+    }
+    return null;
+  };
+  return find(categorias);
+}
+
+function flattenCategories(list, depth = 0) {
+  return list.flatMap((c) => [
+    { id: c.id, label: '— '.repeat(depth) + c.nombre },
+    ...flattenCategories(c.hijas || [], depth + 1),
+  ]);
+}
+
 // ═══════════════════════════════════════════════
-// RENDER DE LA LISTA
+// CARGA DE DATOS
+// ═══════════════════════════════════════════════
+
+async function loadLookups() {
+  try {
+    [categorias, colores, tallas] = await Promise.all([
+      Api.categorias(), Api.colores(), Api.tallas(),
+    ]);
+  } catch (err) {
+    handleApiError(err, 'No se pudieron cargar categorías, colores y tallas');
+  }
+
+  const sel = document.getElementById('fieldCategory');
+  // /categorias devuelve todas (raíces e hijas) con sus hijas anidadas: partimos de las raíces
+  const roots = categorias.filter((c) => !c.padreId);
+  const flat = flattenCategories(roots.length ? roots : categorias);
+  sel.innerHTML = '<option value="">Selecciona…</option>' +
+    flat.map((c) => `<option value="${esc(c.id)}">${esc(c.label)}</option>`).join('');
+}
+
+async function loadProducts(p = page) {
+  const listEl = document.getElementById('adminList');
+  if (listEl) listEl.innerHTML = '<div class="admin-empty"><p>Cargando catálogo…</p></div>';
+
+  try {
+    const params = { page: p, limit: PAGE_LIMIT };
+    if (statusFilter) params.activo = statusFilter;
+    const res = await Api.adminProductos(params);
+    if (res.data.length === 0 && p > 1) return loadProducts(p - 1);
+    page = res.page;
+    total = res.total;
+    productsCache = res.data.map(normalizeProduct);
+  } catch (err) {
+    productsCache = [];
+    total = 0;
+    handleApiError(err, 'No se pudo cargar el catálogo');
+  }
+  renderAdminList();
+  renderPager();
+  refreshExistingVariants();
+}
+
+// ═══════════════════════════════════════════════
+// RENDER
 // ═══════════════════════════════════════════════
 
 const trashIconSVG = `<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>`;
@@ -72,187 +169,351 @@ function renderAdminList() {
   const countEl = document.getElementById('adminCount');
   if (!listEl) return;
 
-  const products = adminLoadProducts();
-
   if (countEl) {
-    countEl.textContent = products.length === 0
-      ? 'Sin productos aún'
-      : `${products.length} ${products.length === 1 ? 'producto guardado' : 'productos guardados'}`;
+    const label = statusFilter === 'true' ? 'activo' : statusFilter === 'false' ? 'desactivado' : 'guardado';
+    countEl.textContent = total === 0
+      ? 'Sin productos'
+      : `${total} ${total === 1 ? 'producto' : 'productos'} ${label}${total === 1 ? '' : 's'}`;
   }
 
-  if (products.length === 0) {
+  if (productsCache.length === 0) {
     listEl.innerHTML = `
       <div class="admin-empty">
         ${emptyBoxIconSVG}
-        <p>Aún no has agregado productos.<br>Usa el formulario de la izquierda para crear el primero.</p>
+        <p>${statusFilter ? 'No hay productos con este filtro.' : 'Aún no has agregado productos.<br>Usa el formulario de la izquierda para crear el primero.'}</p>
       </div>`;
     return;
   }
 
-  listEl.innerHTML = products.map(p => {
-    const images = adminGetProductImages(p);
-    const thumb = images[0] || '';
-    const photoCount = images.length > 1 ? ` · ${images.length} fotos` : '';
+  listEl.innerHTML = productsCache.map((p) => {
+    const thumb = p.images[0] || '';
+    const activeVariants = p.variantes.filter((v) => v.activo !== false);
+    const stock = activeVariants.reduce((s, v) => s + (v.stock || 0), 0);
+    const meta = [
+      p.activo ? null : 'Desactivado',
+      categoryName(p.categoriaId),
+      `${activeVariants.length} ${activeVariants.length === 1 ? 'variante' : 'variantes'}`,
+      `stock ${stock}`,
+      p.images.length > 1 ? `${p.images.length} fotos` : null,
+    ].filter(Boolean).join(' · ');
+    const lastAction = p.activo
+      ? `<button class="admin-icon-btn danger admin-delete-btn" aria-label="Desactivar producto" title="Desactivar">${trashIconSVG}</button>`
+      : `<button class="admin-icon-btn admin-activate-btn" aria-label="Reactivar producto" title="Reactivar">↺</button>`;
     return `
-    <div class="admin-row" data-id="${p.id}">
-      <img class="admin-row-thumb" src="${thumb}" alt="${p.name}" onerror="this.style.visibility='hidden'">
+    <div class="admin-row ${p.activo ? '' : 'is-inactive'}" data-id="${esc(p.id)}">
+      <img class="admin-row-thumb" src="${esc(thumb)}" alt="${esc(p.name)}" onerror="this.style.visibility='hidden'">
       <div class="admin-row-info">
-        <div class="admin-row-name">${p.name}</div>
-        <div class="admin-row-meta">${p.badge ? p.badge + ' · ' : ''}${p.rating ? `★ ${p.rating}${p.reviews ? ` (${p.reviews})` : ''}` : 'Sin reseñas'}${photoCount}</div>
+        <div class="admin-row-name">${esc(p.name)}</div>
+        <div class="admin-row-meta">${esc(meta)}</div>
       </div>
-      <div class="admin-row-price">${adminFormatPrice(p.price)}</div>
+      <div class="admin-row-price">${formatPrice(p.price)}</div>
       <div class="admin-row-actions">
-        <button class="admin-icon-btn admin-edit-btn" aria-label="Editar producto">${editIconSVG}</button>
-        <button class="admin-icon-btn danger admin-delete-btn" aria-label="Eliminar producto">${trashIconSVG}</button>
+        <button class="admin-icon-btn admin-edit-btn" aria-label="Editar producto" title="Editar">${editIconSVG}</button>
+        ${lastAction}
       </div>
-    </div>
-  `;
+    </div>`;
   }).join('');
+}
+
+function renderPager() {
+  const el = document.getElementById('adminPager');
+  if (!el) return;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <button type="button" data-page="${page - 1}" ${page <= 1 ? 'disabled' : ''}>Anterior</button>
+    <span>Página ${page} de ${totalPages}</span>
+    <button type="button" data-page="${page + 1}" ${page >= totalPages ? 'disabled' : ''}>Siguiente</button>`;
+}
+
+// ═══════════════════════════════════════════════
+// VARIANTES
+// ═══════════════════════════════════════════════
+
+function optionsHtml(items, placeholder) {
+  return `<option value="">${placeholder}</option>` +
+    items.map((i) => `<option value="${esc(i.id)}">${esc(i.nombre)}</option>`).join('');
+}
+
+function addVariantRow() {
+  const row = document.createElement('div');
+  row.className = 'admin-variant-row';
+  row.innerHTML = `
+    <select class="v-color">${optionsHtml(colores, 'Color')}</select>
+    <select class="v-talla">${optionsHtml(tallas, 'Talla')}</select>
+    <input type="text" class="v-sku" placeholder="SKU">
+    <input type="number" class="v-stock" placeholder="Stock" min="0" value="0">
+    <input type="number" class="v-precio" placeholder="Precio (opcional)" min="1">
+    <button type="button" class="admin-image-remove" aria-label="Quitar variante">&times;</button>`;
+  row.querySelector('.admin-image-remove').addEventListener('click', () => row.remove());
+  document.getElementById('variantRows').appendChild(row);
+}
+
+function readVariantRows() {
+  return Array.from(document.querySelectorAll('#variantRows .admin-variant-row')).map((el) => {
+    const precio = el.querySelector('.v-precio').value;
+    return {
+      el,
+      data: {
+        colorId: Number(el.querySelector('.v-color').value),
+        tallaId: Number(el.querySelector('.v-talla').value),
+        sku: el.querySelector('.v-sku').value.trim(),
+        stock: Math.max(0, parseInt(el.querySelector('.v-stock').value, 10) || 0),
+        ...(precio ? { precio: Number(precio) } : {}),
+      },
+    };
+  });
+}
+
+function renderExistingVariants(product) {
+  const box = document.getElementById('existingVariants');
+  if (!product || product.variantes.length === 0) { box.innerHTML = ''; return; }
+  box.innerHTML = product.variantes.map((v) => {
+    const on = v.activo !== false;
+    return `
+    <div class="admin-variant-existing ${on ? '' : 'is-inactive'}" data-vid="${esc(v.id)}">
+      <span>${esc(v.color?.nombre)} / ${esc(v.talla?.nombre)} · SKU ${esc(v.sku)} · stock ${esc(v.stock)}${on ? '' : ' · desactivada'}</span>
+      <span class="admin-variant-actions">
+        ${on ? '<button type="button" data-act="stock">+ Stock</button>' : ''}
+        <button type="button" data-act="toggle">${on ? 'Desactivar' : 'Reactivar'}</button>
+      </span>
+    </div>`;
+  }).join('');
+}
+
+// Re-pinta las variantes del producto en edición tras recargar la lista
+function refreshExistingVariants() {
+  if (!editingId) return;
+  const p = productsCache.find((x) => String(x.id) === String(editingId));
+  if (p) renderExistingVariants(p);
+}
+
+async function handleVariantAction(e) {
+  const btn = e.target.closest('button[data-act]');
+  const rowEl = e.target.closest('[data-vid]');
+  if (!btn || !rowEl || !editingId) return;
+
+  const prod = productsCache.find((x) => String(x.id) === String(editingId));
+  const variant = prod && prod.variantes.find((v) => String(v.id) === rowEl.dataset.vid);
+  if (!variant) return;
+
+  try {
+    if (btn.dataset.act === 'stock') {
+      const { value, isConfirmed } = await Swal.fire({
+        title: 'Ingresar stock',
+        text: `${variant.color?.nombre || ''} / ${variant.talla?.nombre || ''} · stock actual ${variant.stock}`,
+        input: 'number',
+        inputAttributes: { min: 1, step: 1 },
+        inputPlaceholder: 'Unidades a sumar',
+        showCancelButton: true,
+        confirmButtonText: 'Sumar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#e23789',
+        inputValidator: (v) => (!Number.isInteger(Number(v)) || Number(v) < 1) ? 'Ingresa un entero mayor a 0' : null,
+      });
+      if (!isConfirmed) return;
+      await Api.actualizarVariante(variant.id, { agregarStock: Number(value) });
+      showToast('Stock actualizado');
+    } else if (btn.dataset.act === 'toggle') {
+      const next = variant.activo === false;
+      if (!next) {
+        const ok = await confirmDialog(
+          '¿Desactivar esta variante?',
+          'Los clientes dejarán de poder comprarla.',
+          'Sí, desactivar'
+        );
+        if (!ok) return;
+      }
+      await Api.actualizarVariante(variant.id, { activo: next });
+      showToast(next ? 'Variante reactivada' : 'Variante desactivada');
+    }
+    await loadProducts(page);
+  } catch (err) {
+    handleApiError(err, 'No se pudo actualizar la variante');
+  }
 }
 
 // ═══════════════════════════════════════════════
 // FORMULARIO
 // ═══════════════════════════════════════════════
 
-function fillFormWithProduct(p) {
-  document.getElementById('fieldName').value = p.name || '';
-  document.getElementById('fieldPrice').value = p.price ?? '';
-  document.getElementById('fieldBadge').value = p.badge || '';
-  document.getElementById('fieldRating').value = p.rating ?? '';
-  document.getElementById('fieldReviews').value = p.reviews ?? '';
-
-  if (typeof window.setProductImageUrls === 'function') {
-    window.setProductImageUrls(adminGetProductImages(p));
-  }
-}
-
 function resetForm() {
   document.getElementById('productForm').reset();
-  if (typeof window.setProductImageUrls === 'function') {
-    window.setProductImageUrls([]);
-  }
+  window.setProductImageUrls([]);
+  document.getElementById('variantRows').innerHTML = '';
+  renderExistingVariants(null);
   editingId = null;
+  slugTouched = false;
   document.getElementById('editingBanner').classList.remove('active');
   document.getElementById('submitBtnLabel').textContent = 'Guardar producto';
 }
 
-function startEditing(id) {
-  const product = adminLoadProducts().find(p => p.id === id);
-  if (!product) return;
-
-  editingId = id;
-  fillFormWithProduct(product);
-
-  const banner = document.getElementById('editingBanner');
-  banner.classList.add('active');
+function enterEditMode(product) {
+  editingId = product.id;
+  slugTouched = true;
+  document.getElementById('editingBanner').classList.add('active');
   document.getElementById('editingBannerText').textContent = `Editando "${product.name}"`;
   document.getElementById('submitBtnLabel').textContent = 'Guardar cambios';
+}
+
+function startEditing(id) {
+  const p = productsCache.find((x) => String(x.id) === String(id));
+  if (!p) return;
+
+  document.getElementById('fieldName').value = p.name;
+  document.getElementById('fieldSlug').value = p.slug;
+  document.getElementById('fieldPrice').value = p.price;
+  document.getElementById('fieldCategory').value = String(p.categoriaId);
+  document.getElementById('fieldDescription').value = p.description;
+  window.setProductImageUrls(p.images);
+  document.getElementById('variantRows').innerHTML = '';
+  renderExistingVariants(p);
+  enterEditMode(p);
 
   document.getElementById('fieldName').focus();
   document.getElementById('adminFormCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function deleteProduct(id) {
-  const products = adminLoadProducts();
-  const product = products.find(p => p.id === id);
-  if (!product) return;
+async function setProductActive(id, activo) {
+  const p = productsCache.find((x) => String(x.id) === String(id));
+  if (!p) return;
 
-  const confirmed = confirm(`¿Eliminar "${product.name}" del catálogo? Esta acción no se puede deshacer.`);
-  if (!confirmed) return;
+  if (!activo) {
+    const ok = await confirmDialog(
+      `¿Desactivar "${p.name}"?`,
+      'Dejará de mostrarse en la tienda. Los pedidos anteriores no se afectan y podrás reactivarlo.',
+      'Sí, desactivar'
+    );
+    if (!ok) return;
+  }
 
-  const updated = products.filter(p => p.id !== id);
-  adminSaveProducts(updated);
-  renderAdminList();
-  showToast('Producto eliminado');
-
-  if (editingId === id) resetForm();
+  try {
+    await Api.actualizarProducto(p.id, { activo });
+    showToast(activo ? 'Producto reactivado' : 'Producto desactivado');
+    if (!activo && String(editingId) === String(id)) resetForm();
+    await loadProducts(page);
+  } catch (err) {
+    handleApiError(err, activo ? 'No se pudo reactivar el producto' : 'No se pudo desactivar el producto');
+  }
 }
 
-function handleSubmit(e) {
+function setSaving(state) {
+  isSaving = state;
+  const btn = document.querySelector('#productForm button[type="submit"]');
+  if (btn) btn.disabled = state;
+  document.getElementById('submitBtnLabel').textContent = state
+    ? 'Guardando…'
+    : (editingId ? 'Guardar cambios' : 'Guardar producto');
+}
+
+async function handleSubmit(e) {
   e.preventDefault();
+  if (isSaving) return;
 
-  const name = document.getElementById('fieldName').value.trim();
-  const price = Number(document.getElementById('fieldPrice').value);
-  const images = typeof window.getProductImageUrls === 'function'
-    ? window.getProductImageUrls()
-    : [];
-  const badge = document.getElementById('fieldBadge').value.trim();
-  const ratingRaw = document.getElementById('fieldRating').value;
-  const reviewsRaw = document.getElementById('fieldReviews').value;
+  const nombre = document.getElementById('fieldName').value.trim();
+  const slug = document.getElementById('fieldSlug').value.trim() || slugify(nombre);
+  const precioBase = Number(document.getElementById('fieldPrice').value);
+  const categoriaId = Number(document.getElementById('fieldCategory').value);
+  const descripcion = document.getElementById('fieldDescription').value.trim();
+  const imagenes = window.getProductImageUrls();
 
-  if (!name || !price || price <= 0) {
-    showToast('Nombre y precio son obligatorios');
+  if (!nombre || !slug || !precioBase || precioBase <= 0 || !categoriaId) {
+    showToast('Nombre, precio y categoría son obligatorios');
     return;
   }
 
-  const products = adminLoadProducts();
-
-  const productData = {
-    id: editingId || adminSlugify(name),
-    name,
-    price,
-    images,
-    ...(badge ? { badge } : {}),
-    ...(ratingRaw ? { rating: Number(ratingRaw) } : {}),
-    ...(reviewsRaw ? { reviews: Number(reviewsRaw) } : {}),
-  };
-
-  if (editingId) {
-    // Actualizar producto existente
-    const idx = products.findIndex(p => p.id === editingId);
-    if (idx !== -1) products[idx] = productData;
-    adminSaveProducts(products);
-    showToast('Producto actualizado');
-  } else {
-    // Crear nuevo — evita duplicar el mismo id (mismo nombre)
-    if (products.some(p => p.id === productData.id)) {
-      showToast('Ya existe un producto con ese nombre');
-      return;
-    }
-    products.push(productData);
-    adminSaveProducts(products);
-    showToast('Producto agregado');
+  const variantRows = readVariantRows();
+  if (variantRows.some((v) => !v.data.colorId || !v.data.tallaId || !v.data.sku)) {
+    showToast('Cada variante necesita color, talla y SKU');
+    return;
   }
 
+  const payload = {
+    categoriaId, nombre, slug, precioBase, imagenes,
+    ...(descripcion ? { descripcion } : {}),
+  };
+
+  const wasCreate = !editingId;
+  setSaving(true);
+  let productId = editingId;
+  try {
+    if (wasCreate) {
+      const created = await Api.crearProducto(payload);
+      productId = created.id;
+    } else {
+      await Api.actualizarProducto(editingId, payload);
+    }
+  } catch (err) {
+    handleApiError(err, 'No se pudo guardar el producto');
+    setSaving(false);
+    return;
+  }
+
+  // Variantes nuevas, una por una (cada una es un POST aparte)
+  for (const row of variantRows) {
+    try {
+      await Api.crearVariante(productId, row.data);
+      row.el.remove(); // ya creada: la quitamos para no duplicarla si hay que reintentar
+    } catch (err) {
+      // El producto ya existe: pasamos a modo edición con las variantes que faltan
+      statusFilter = '';
+      document.getElementById('statusFilter').value = '';
+      await loadProducts(wasCreate ? 1 : page);
+      const prod = productsCache.find((x) => String(x.id) === String(productId));
+      if (prod) { enterEditMode(prod); renderExistingVariants(prod); }
+      setSaving(false);
+      handleApiError(err, `El producto se guardó, pero falló la variante ${row.data.sku}`);
+      return;
+    }
+  }
+
+  showToast(wasCreate ? 'Producto agregado' : 'Producto actualizado');
+  setSaving(false);
   resetForm();
-  renderAdminList();
-}
-
-function clearAllProducts() {
-  const products = adminLoadProducts();
-  if (products.length === 0) return;
-
-  const confirmed = confirm('¿Vaciar TODO el catálogo? Esto eliminará todos los productos guardados.');
-  if (!confirmed) return;
-
-  adminSaveProducts([]);
-  resetForm();
-  renderAdminList();
-  showToast('Catálogo vaciado');
+  if (wasCreate) {
+    // Los nuevos salen primero (orden por fecha): volvemos a la página 1 y quitamos el filtro
+    statusFilter = '';
+    document.getElementById('statusFilter').value = '';
+  }
+  await loadProducts(wasCreate ? 1 : page);
 }
 
 // ═══════════════════════════════════════════════
 // EVENTOS
 // ═══════════════════════════════════════════════
 
-document.addEventListener('DOMContentLoaded', () => {
-  renderAdminList();
-
+document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('productForm').addEventListener('submit', handleSubmit);
   document.getElementById('cancelEditBtn').addEventListener('click', resetForm);
-  document.getElementById('clearAllBtn').addEventListener('click', clearAllProducts);
+  document.getElementById('addVariantBtn').addEventListener('click', addVariantRow);
+  document.getElementById('existingVariants').addEventListener('click', handleVariantAction);
+
+  const nameInput = document.getElementById('fieldName');
+  const slugInput = document.getElementById('fieldSlug');
+  nameInput.addEventListener('input', () => {
+    if (!slugTouched) slugInput.value = slugify(nameInput.value);
+  });
+  slugInput.addEventListener('input', () => { slugTouched = true; });
+
+  document.getElementById('statusFilter').addEventListener('change', (e) => {
+    statusFilter = e.target.value;
+    loadProducts(1);
+  });
 
   document.getElementById('adminList').addEventListener('click', (e) => {
     const row = e.target.closest('.admin-row');
     if (!row) return;
     const id = row.dataset.id;
-
     if (e.target.closest('.admin-edit-btn')) startEditing(id);
-    if (e.target.closest('.admin-delete-btn')) deleteProduct(id);
+    if (e.target.closest('.admin-delete-btn')) setProductActive(id, false);
+    if (e.target.closest('.admin-activate-btn')) setProductActive(id, true);
   });
-});
 
-// Si se agregan/quitan productos desde otra pestaña, refleja el cambio aquí también
-window.addEventListener('storage', (e) => {
-  if (e.key === ADMIN_PRODUCTS_KEY) renderAdminList();
+  document.getElementById('adminPager').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-page]');
+    if (btn && !btn.disabled) loadProducts(Number(btn.dataset.page));
+  });
+
+  await loadLookups();
+  await loadProducts(1);
 });

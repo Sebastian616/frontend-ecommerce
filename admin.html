@@ -6,18 +6,16 @@
 <title>Panel de administración — Orbisa</title>
 
 <!-- ═══════ GUARDIA DE ACCESO ═══════
-     Se ejecuta ANTES de cargar cualquier otra cosa. Si no hay
-     sesión de admin activa, redirige a login.html de inmediato. -->
+     Solo mejora la experiencia: la seguridad real está en el backend (soloAdmin). -->
 <script>
 (function () {
   try {
+    var token = localStorage.getItem('orbisa_token');
     var raw = localStorage.getItem('orbisa_session');
     var session = raw ? JSON.parse(raw) : null;
-    if (!session) {
+    if (!token || !session) {
       location.replace('login.html');
     } else if (session.role !== 'admin') {
-      // Tiene sesión pero no es admin — no lo mandamos a login (ya está
-      // logueado), directo a que no tiene nada que hacer aquí.
       location.replace('index.html');
     }
   } catch (e) {
@@ -30,6 +28,59 @@
 <link rel="stylesheet" href="./css/index.css">
 <link rel="stylesheet" href="./css/admin.css">
 <link rel="icon" type="image/png" href="./img/logotransparente.png">
+<style>
+  .admin-image-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+  .admin-image-row { display: flex; gap: 8px; align-items: center; }
+  .admin-image-row input { flex: 1; }
+  .admin-image-remove {
+    flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+    border: none; background: var(--blush-mid, #f4e9ef); color: var(--plum, #241233);
+    font-size: 16px; line-height: 1; cursor: pointer;
+  }
+  .admin-image-remove:hover { background: var(--pink, #e23789); color: #fff; }
+  .admin-image-add {
+    border: 1px dashed var(--pink, #e23789); background: none; color: var(--pink, #e23789);
+    font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 999px; cursor: pointer;
+  }
+  .admin-image-add:hover { background: var(--blush-mid, #f4e9ef); }
+
+  .admin-field select, .admin-field textarea {
+    width: 100%; font: inherit; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--blush-mid, #f4e9ef); background: #fff; color: inherit; box-sizing: border-box;
+  }
+  .admin-field textarea { resize: vertical; min-height: 70px; }
+
+  .admin-variant-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
+  .admin-variant-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px;
+    border: 1px solid var(--blush-mid, #f4e9ef); border-radius: 12px;
+  }
+  .admin-variant-row select, .admin-variant-row input {
+    width: 100%; font: inherit; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--blush-mid, #f4e9ef); box-sizing: border-box;
+  }
+  .admin-variant-row .admin-image-remove { grid-column: 1 / -1; justify-self: end; }
+  .admin-existing-variants { font-size: 13px; margin-bottom: 10px; }
+  .admin-existing-variants div { padding: 6px 0; border-bottom: 1px solid var(--blush-mid, #f4e9ef); }
+  .admin-pager { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 16px; font-size: 13px; }
+  .admin-pager button {
+    border: none; background: var(--blush-mid, #f4e9ef); padding: 6px 14px; border-radius: 999px; cursor: pointer;
+  }
+  .admin-pager button:disabled { opacity: .4; cursor: default; }
+  .admin-row.is-inactive { opacity: .55; }
+  .admin-variant-existing { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .admin-variant-existing.is-inactive { opacity: .5; }
+  .admin-variant-actions { flex-shrink: 0; }
+  .admin-variant-actions button {
+    border: none; background: var(--blush-mid, #f4e9ef); border-radius: 999px;
+    padding: 4px 10px; font-size: 12px; cursor: pointer; margin-left: 4px;
+  }
+  .admin-variant-actions button:hover { background: var(--pink, #e23789); color: #fff; }
+  .admin-filter {
+    font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--blush-mid, #f4e9ef); background: #fff;
+  }
+</style>
 </head>
 <body>
 
@@ -54,55 +105,48 @@
         <input type="text" id="fieldName" placeholder="Ej: Top deportivo Breeze" required>
       </div>
 
+      <div class="admin-field">
+        <label for="fieldSlug">Slug (URL) *</label>
+        <input type="text" id="fieldSlug" placeholder="top-deportivo-breeze" required>
+        <div class="admin-field-hint">Se genera solo a partir del nombre. Debe ser único.</div>
+      </div>
+
       <div class="admin-field-row">
         <div class="admin-field">
-          <label for="fieldPrice">Precio (COP) *</label>
+          <label for="fieldPrice">Precio base (COP) *</label>
           <input type="number" id="fieldPrice" placeholder="89000" min="1" required>
         </div>
         <div class="admin-field">
-          <label for="fieldBadge">Etiqueta</label>
-          <input type="text" id="fieldBadge" placeholder="Nuevo">
+          <label for="fieldCategory">Categoría *</label>
+          <select id="fieldCategory" required>
+            <option value="">Cargando…</option>
+          </select>
         </div>
+      </div>
+
+      <div class="admin-field">
+        <label for="fieldDescription">Descripción</label>
+        <textarea id="fieldDescription" placeholder="Opcional"></textarea>
       </div>
 
       <div class="admin-field">
         <label>Fotos del producto</label>
         <div id="imageFieldsList" class="admin-image-list">
           <div class="admin-image-row">
-            <input type="text" class="admin-image-input" placeholder="img/mi-producto-1.jpg">
+            <input type="text" class="admin-image-input" placeholder="https://…/mi-producto-1.jpg">
             <button type="button" class="admin-image-remove" aria-label="Quitar imagen">&times;</button>
           </div>
         </div>
         <button type="button" id="addImageFieldBtn" class="admin-image-add">+ Agregar otra foto</button>
-        <div class="admin-field-hint">La primera foto es la que se ve en la tarjeta del producto. Agrega varias para mostrar un carrusel al hacer click.</div>
+        <div class="admin-field-hint">La primera foto es la que se ve en la tarjeta del producto.</div>
       </div>
 
-      <style>
-        .admin-image-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
-        .admin-image-row { display: flex; gap: 8px; align-items: center; }
-        .admin-image-row input { flex: 1; }
-        .admin-image-remove {
-          flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
-          border: none; background: var(--blush-mid, #f4e9ef); color: var(--plum, #241233);
-          font-size: 16px; line-height: 1; cursor: pointer;
-        }
-        .admin-image-remove:hover { background: var(--pink, #e23789); color: #fff; }
-        .admin-image-add {
-          border: 1px dashed var(--pink, #e23789); background: none; color: var(--pink, #e23789);
-          font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 999px; cursor: pointer;
-        }
-        .admin-image-add:hover { background: var(--blush-mid, #f4e9ef); }
-      </style>
-
-      <div class="admin-field-row">
-        <div class="admin-field">
-          <label for="fieldRating">Calificación</label>
-          <input type="number" id="fieldRating" placeholder="4.5" min="0" max="5" step="0.1">
-        </div>
-        <div class="admin-field">
-          <label for="fieldReviews">N.º de reseñas</label>
-          <input type="number" id="fieldReviews" placeholder="128" min="0">
-        </div>
+      <div class="admin-field">
+        <label>Variantes (color + talla)</label>
+        <div id="existingVariants" class="admin-existing-variants"></div>
+        <div id="variantRows" class="admin-variant-list"></div>
+        <button type="button" id="addVariantBtn" class="admin-image-add">+ Agregar variante</button>
+        <div class="admin-field-hint">Sin variantes el cliente no podrá comprar el producto. El precio es opcional: si lo dejas vacío se usa el precio base.</div>
       </div>
 
       <div class="admin-form-actions">
@@ -120,12 +164,17 @@
         <div class="admin-list-title">Catálogo actual</div>
         <div class="admin-list-count" id="adminCount"></div>
       </div>
-      <button type="button" class="admin-clear-all" id="clearAllBtn">Vaciar todo</button>
+      <select id="statusFilter" class="admin-filter" aria-label="Filtrar por estado">
+        <option value="">Todos</option>
+        <option value="true">Activos</option>
+        <option value="false">Desactivados</option>
+      </select>
     </div>
 
     <div class="admin-table" id="adminList">
       <!-- admin.js llena esto dinámicamente -->
     </div>
+    <div class="admin-pager" id="adminPager"></div>
   </div>
 
 </div>
@@ -143,7 +192,7 @@
       const input = document.createElement('input');
       input.type = 'text';
       input.className = 'admin-image-input';
-      input.placeholder = 'img/mi-producto.jpg';
+      input.placeholder = 'https://…/mi-producto.jpg';
       input.value = value || '';
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
@@ -161,8 +210,6 @@
 
     addBtn.addEventListener('click', () => list.appendChild(makeRow()));
 
-    // admin.js llama a estas dos funciones globales para leer
-    // y para precargar las fotos al editar un producto existente.
     window.getProductImageUrls = function () {
       return Array.from(list.querySelectorAll('.admin-image-input'))
         .map((input) => input.value.trim())
@@ -177,7 +224,9 @@
   })();
 </script>
 
- <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="./js/config.js"></script>
+<script src="./js/api.js"></script>
 <script src="./js/auth.js"></script>
 <script src="./js/adminNav.js"></script>
 <script src="./js/admin.js"></script>

@@ -1,31 +1,7 @@
 // ═══════════════════════════════════════════════
 // OrbIsa — Vista de Tienda / Catálogo
-// Renderiza los productos guardados en localStorage
-// bajo la clave PRODUCTS_STORAGE_KEY.
-//
-// Formato esperado en localStorage (array de objetos):
-// [
-//   {
-//     "id": "top-deportivo-breeze",   // único, usado por el carrito
-//     "name": "Top deportivo Breeze",
-//     "price": 89000,                 // número, sin formatear
-//     "images": [                     // una o varias fotos — la primera es la miniatura
-//       "img/top-breeze-1.jpg",
-//       "img/top-breeze-2.jpg"
-//     ],
-//     "badge": "Nuevo",               // opcional
-//     "rating": 4.5,                  // opcional
-//     "reviews": 128                  // opcional
-//   },
-//   ...
-// ]
-//
-// Compatibilidad: si un producto viejo solo tiene "image" (string)
-// en vez de "images" (array), igual funciona — se muestra como
-// una sola foto sin controles de carrusel.
+// Ahora consume la API (requiere js/api.js cargado antes).
 // ═══════════════════════════════════════════════
-
-const PRODUCTS_STORAGE_KEY = 'orbisa_products';
 
 const heartIconSVG = `<svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
 const starIconSVG = `<svg viewBox="0 0 24 24"><polygon points="12 2 15 9 22 9.5 17 14.5 18.5 22 12 18 5.5 22 7 14.5 2 9.5 9 9"/></svg>`;
@@ -33,108 +9,125 @@ const cartIconSVG = `<svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><cir
 const emptyCartIconSVG = `<svg viewBox="0 0 24 24"><path d="M9 2h6l1 5-2 4h-4L8 8zM9 14h6l1 7H8z"/></svg>`;
 const zoomIconSVG = `<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>`;
 
-// Guarda el último catálogo renderizado para poder buscar
-// un producto por id cuando se hace click en su foto.
 let productsCache = [];
 
-function loadProducts() {
-  try {
-    const raw = localStorage.getItem(PRODUCTS_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    console.warn('No se pudo leer el catálogo guardado.', e);
-    return [];
-  }
+// Los datos vienen de la API: se escapan antes de usarlos en innerHTML
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Convierte un producto de la API al formato que usa esta vista
+function mapProduct(p) {
+  return {
+    id: p.id,
+    name: p.nombre,
+    price: Number(p.precioBase),
+    images: p.imagenes || [],
+    variantes: (p.variantes || []).map((v) => ({
+      id: v.id,
+      color: v.color.nombre,
+      talla: v.talla.nombre,
+      stock: v.stock,
+      price: v.precio != null ? Number(v.precio) : Number(p.precioBase),
+    })),
+  };
+}
+
+// Trae todo el catálogo (la API entrega máx. 50 por página)
+async function loadProducts() {
+  const all = [];
+  let page = 1, total = 0;
+  do {
+    const res = await Api.productos({ page, limit: 50 });
+    all.push(...res.data);
+    total = res.total;
+    page++;
+  } while (all.length < total);
+  return all.map(mapProduct);
 }
 
 function formatProductPrice(n) {
   return '$' + Number(n).toLocaleString('es-CO') + ' COP';
 }
 
-// Devuelve siempre un array de fotos, sin importar si el producto
-// se guardó con "images" (array) o con el "image" (string) viejo.
 function getProductImages(product) {
-  if (Array.isArray(product.images) && product.images.length) return product.images;
-  if (product.image) return [product.image];
-  return [];
+  return Array.isArray(product.images) ? product.images : [];
 }
 
 function renderProductCard(product) {
   const images = getProductImages(product);
   const thumb = images[0] || '';
-
-  const badge = product.badge
-    ? `<span class="product-badge-new">${product.badge}</span>`
-    : '';
-
-  const rating = (product.rating || product.reviews)
-    ? `<div class="product-card-rating">${starIconSVG} ${product.rating ?? ''} ${product.reviews ? `(${product.reviews})` : ''}</div>`
-    : '';
+  const hayStock = product.variantes.some((v) => v.stock > 0);
+  const badge = !hayStock ? `<span class="product-badge-new">Agotado</span>` : '';
 
   const zoomBtn = images.length
-    ? `<button type="button" class="product-zoom-btn" aria-label="Ver fotos de ${product.name}">${zoomIconSVG}</button>`
+    ? `<button type="button" class="product-zoom-btn" aria-label="Ver fotos de ${esc(product.name)}">${zoomIconSVG}</button>`
     : '';
 
   return `
     <div class="product-card reveal visible" data-id="${product.id}">
-      <div class="product-card-media" data-id="${product.id}" role="button" tabindex="0" aria-label="Ver fotos de ${product.name}">
-        <img src="${thumb}" alt="${product.name}" loading="lazy">
+      <div class="product-card-media" data-id="${product.id}" role="button" tabindex="0" aria-label="Ver fotos de ${esc(product.name)}">
+        <img src="${esc(thumb)}" alt="${esc(product.name)}" loading="lazy">
         ${badge}
         <div class="product-wish" aria-label="Agregar a favoritos">${heartIconSVG}</div>
         ${zoomBtn}
       </div>
       <div class="product-card-body">
-        <div class="product-card-name">${product.name}</div>
-        ${rating}
+        <div class="product-card-name">${esc(product.name)}</div>
         <div class="product-card-footer">
           <span class="product-card-price">${formatProductPrice(product.price)}</span>
-          <button class="product-cart-btn" aria-label="Agregar al carrito">${cartIconSVG}</button>
+          <button class="product-cart-btn" data-id="${product.id}" aria-label="Agregar al carrito" ${hayStock ? '' : 'disabled'}>${cartIconSVG}</button>
         </div>
       </div>
     </div>`;
 }
 
-function renderEmptyState() {
+function renderMessage(title, text, withHome = true) {
   return `
     <div class="shop-empty">
       ${emptyCartIconSVG}
-      <h3>Todavía no hay productos</h3>
-      <p>Estamos preparando el catálogo. Vuelve pronto para ver las novedades.</p>
-      <a href="index.html" class="cta-link">Volver al inicio</a>
+      <h3>${title}</h3>
+      <p>${text}</p>
+      ${withHome ? '<a href="index.html" class="cta-link">Volver al inicio</a>' : ''}
     </div>`;
 }
 
-function renderShop() {
+async function renderShop() {
   const grid = document.getElementById('shopGrid');
   const countLabel = document.getElementById('shopCount');
   if (!grid) return;
 
-  const products = loadProducts();
-  productsCache = products;
+  grid.classList.add('is-empty');
+  grid.innerHTML = renderMessage('Cargando catálogo…', 'Un momento por favor.', false);
 
-  if (products.length === 0) {
-    grid.innerHTML = '';
-    grid.classList.add('is-empty');
-    grid.insertAdjacentHTML('beforeend', renderEmptyState());
+  try {
+    productsCache = await loadProducts();
+  } catch (e) {
+    console.error(e);
+    grid.innerHTML = renderMessage('No pudimos cargar los productos',
+      'Revisa tu conexión e inténtalo de nuevo en unos segundos.');
+    if (countLabel) countLabel.textContent = '';
+    return;
+  }
+
+  if (productsCache.length === 0) {
+    grid.innerHTML = renderMessage('Todavía no hay productos',
+      'Estamos preparando el catálogo. Vuelve pronto para ver las novedades.');
   } else {
     grid.classList.remove('is-empty');
-    grid.innerHTML = products.map(renderProductCard).join('');
+    grid.innerHTML = productsCache.map(renderProductCard).join('');
   }
 
   if (countLabel) {
-    countLabel.textContent = products.length === 0
-      ? ''
-      : `${products.length} ${products.length === 1 ? 'producto' : 'productos'}`;
+    const n = productsCache.length;
+    countLabel.textContent = n === 0 ? '' : `${n} ${n === 1 ? 'producto' : 'productos'}`;
   }
 }
 
 // ═══════════════════════════════════════════════
 // MODAL DE FOTOS (carrusel de Bootstrap)
-// Requiere que productos.html tenga el markup del
-// #productModal y que Bootstrap JS esté cargado.
 // ═══════════════════════════════════════════════
-
 function openProductModal(product) {
   const images = getProductImages(product);
   if (!images.length) return;
@@ -146,16 +139,14 @@ function openProductModal(product) {
   if (!modalEl || !titleEl || !inner) return;
 
   titleEl.textContent = product.name;
-
   inner.innerHTML = images.map((src, i) => `
     <div class="carousel-item ${i === 0 ? 'active' : ''}">
-      <img src="${src}" class="d-block w-100" alt="${product.name} — foto ${i + 1}">
+      <img src="${esc(src)}" class="d-block w-100" alt="${esc(product.name)} — foto ${i + 1}">
     </div>`).join('');
 
   const hasMultiple = images.length > 1;
-
   modalEl.querySelectorAll('.carousel-control-prev, .carousel-control-next')
-    .forEach(el => el.classList.toggle('d-none', !hasMultiple));
+    .forEach((el) => el.classList.toggle('d-none', !hasMultiple));
 
   if (indicators) {
     indicators.innerHTML = hasMultiple
@@ -165,17 +156,55 @@ function openProductModal(product) {
             aria-label="Foto ${i + 1}"></button>`).join('')
       : '';
   }
+  bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
 
-  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-  modal.show();
+// ═══════════════════════════════════════════════
+// AGREGAR AL CARRITO (elige color/talla y llama a la API)
+// ═══════════════════════════════════════════════
+async function addToCart(product) {
+  if (!Api.isLogged()) return askLogin(); // viene de cart.js
+
+  const disponibles = product.variantes.filter((v) => v.stock > 0);
+  if (!disponibles.length) return Swal.fire({ icon: 'info', title: 'Producto agotado' });
+
+  let variante = disponibles[0];
+  if (disponibles.length > 1) {
+    const options = Object.fromEntries(disponibles.map((v) =>
+      [v.id, `${v.color} · ${v.talla}${v.stock <= 3 ? ` (quedan ${v.stock})` : ''}`]));
+    const { value, isConfirmed } = await Swal.fire({
+      title: product.name,
+      input: 'select', inputOptions: options, inputPlaceholder: 'Elige color y talla',
+      showCancelButton: true, confirmButtonText: 'Agregar', cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#E23789',
+      inputValidator: (v) => (!v ? 'Selecciona una opción' : undefined),
+    });
+    if (!isConfirmed) return;
+    variante = disponibles.find((v) => String(v.id) === String(value));
+  }
+
+  // cart.js: una sola petición y actualiza el carrito con la respuesta
+  return addVariantToCart(variante.id, product.name);
+}
+
+function findProduct(id) {
+  return productsCache.find((p) => String(p.id) === String(id));
 }
 
 function handleGridClick(e) {
-  if (e.target.closest('.product-wish') || e.target.closest('.product-cart-btn')) return;
+  if (e.target.closest('.product-wish')) return;
+
+  const cartBtn = e.target.closest('.product-cart-btn');
+  if (cartBtn) {
+    const p = findProduct(cartBtn.dataset.id);
+    if (p) addToCart(p);
+    return;
+  }
+
   const mediaEl = e.target.closest('.product-card-media');
   if (!mediaEl) return;
-  const product = productsCache.find(p => String(p.id) === mediaEl.dataset.id);
-  if (product) openProductModal(product);
+  const p = findProduct(mediaEl.dataset.id);
+  if (p) openProductModal(p);
 }
 
 function handleGridKeydown(e) {
@@ -183,11 +212,10 @@ function handleGridKeydown(e) {
   const mediaEl = e.target.closest('.product-card-media');
   if (!mediaEl) return;
   e.preventDefault();
-  const product = productsCache.find(p => String(p.id) === mediaEl.dataset.id);
-  if (product) openProductModal(product);
+  const p = findProduct(mediaEl.dataset.id);
+  if (p) openProductModal(p);
 }
 
-// Primer render al cargar la página
 document.addEventListener('DOMContentLoaded', () => {
   renderShop();
   const grid = document.getElementById('shopGrid');
@@ -195,10 +223,4 @@ document.addEventListener('DOMContentLoaded', () => {
     grid.addEventListener('click', handleGridClick);
     grid.addEventListener('keydown', handleGridKeydown);
   }
-});
-
-// Si el catálogo cambia en OTRA pestaña (por ejemplo, un panel admin
-// abierto en paralelo), esta vista se actualiza sola sin recargar.
-window.addEventListener('storage', (e) => {
-  if (e.key === PRODUCTS_STORAGE_KEY) renderShop();
 });

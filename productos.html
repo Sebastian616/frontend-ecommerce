@@ -52,7 +52,7 @@
   <div class="shop-count" id="shopCount"></div>
 </header>
 
-<!-- ═══════ SHOP GRID (renderizado desde localStorage) ═══════ -->
+<!-- ═══════ SHOP GRID (se llena desde la API) ═══════ -->
 <section class="flow-section products" aria-live="polite">
   <div class="products-grid" id="shopGrid">
     <!-- products.js llena esto dinámicamente -->
@@ -86,8 +86,10 @@
   </div>
 </div>
 
- <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="./js/config.js"></script>
+<script src="./js/api.js"></script>
 <script src="./js/auth.js"></script>
 <script src="./js/navbar.js"></script>
 <script src="./js/footer.js"></script>

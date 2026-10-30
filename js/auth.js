@@ -1,55 +1,43 @@
 // ═══════════════════════════════════════════════
-// OrbIsa — Autenticación (100% localStorage)
-//
-// ⚠️ IMPORTANTE: esto NO es seguridad real de servidor.
-// Cualquiera con acceso a las devtools del navegador puede
-// leer este archivo, ver ADMIN_PASSWORD, o editar localStorage
-// a mano para simular una sesión de admin. Sirve para bloquear
-// el acceso casual (un cliente normal no debería poder entrar
-// al panel ni comprar sin cuenta), pero NO reemplaza un backend
-// con autenticación real si este sitio se publica de verdad.
+// OrbIsa — Sesión de usuario (conectada a la API)
+// Requiere js/api.js cargado antes.
+// Mantiene las mismas funciones que usa login.js:
+//   getSession(), loginUser(), registerUser()
 // ═══════════════════════════════════════════════
 
-const AUTH_USERS_KEY = 'orbisa_users';
-const AUTH_SESSION_KEY = 'orbisa_session';
+const AUTH_SESSION_KEY = 'orbisa_session'; // mismo nombre que tu versión anterior
 
-// Credenciales fijas del admin — solo válidas en este entorno de demo.
-// En un proyecto real esto vive en un backend, nunca en JS del cliente.
-const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = 'Orb1sa#Adm2026!Secure';
-
-// ── Hash de contraseñas con SHA-256 (Web Crypto API, nativa del navegador) ──
-// Evita guardar contraseñas en texto plano en localStorage.
-async function hashPassword(password) {
-  const encoded = new TextEncoder().encode(password);
-  const buffer = await crypto.subtle.digest('SHA-256', encoded);
-  return Array.from(new Uint8Array(buffer))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-// ── Usuarios registrados ──
-function loadUsers() {
+// Lee la fecha de vencimiento del JWT (sin verificar firma: eso lo hace el servidor)
+function tokenExpirado(token) {
   try {
-    const raw = localStorage.getItem(AUTH_USERS_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    console.warn('No se pudieron leer los usuarios registrados.', e);
-    return [];
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return !payload.exp || payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
   }
 }
 
-function saveUsers(users) {
-  localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
+function saveSession(usuario) {
+  const session = {
+    id: usuario.id,
+    name: usuario.nombre,
+    email: usuario.email,
+    role: usuario.rol === 'ADMIN' ? 'admin' : 'customer', // mismos roles que antes
+  };
+  localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+  return session;
 }
 
-// ── Sesión activa ──
+// Devuelve { id, name, email, role } o null si no hay sesión válida
 function getSession() {
+  const token = Api.getToken();
+  if (!token || tokenExpirado(token)) {
+    clearSession();
+    return null;
+  }
   try {
-    const raw = localStorage.getItem(AUTH_SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) {
+    return JSON.parse(localStorage.getItem(AUTH_SESSION_KEY)) || null;
+  } catch {
     return null;
   }
 }
@@ -59,6 +47,7 @@ function setSession(session) {
 }
 
 function clearSession() {
+  Api.logout();
   localStorage.removeItem(AUTH_SESSION_KEY);
 }
 
@@ -71,57 +60,54 @@ function isAdmin() {
   return !!session && session.role === 'admin';
 }
 
-// ── Registro ──
-// Devuelve { ok: true } o { ok: false, error: '...' }
-async function registerUser({ name, email, password }) {
-  const normalizedEmail = email.trim().toLowerCase();
-
-  if (normalizedEmail === ADMIN_USERNAME) {
-    return { ok: false, error: 'Ese correo no está disponible.' };
-  }
-
-  const users = loadUsers();
-  if (users.some(u => u.email === normalizedEmail)) {
-    return { ok: false, error: 'Ya existe una cuenta con ese correo.' };
-  }
-
-  const passwordHash = await hashPassword(password);
-  users.push({ name: name.trim(), email: normalizedEmail, passwordHash });
-  saveUsers(users);
-
-  setSession({ name: name.trim(), email: normalizedEmail, role: 'customer' });
-  return { ok: true };
-}
-
-// ── Login ──
-// Devuelve { ok: true, role: 'admin'|'customer' } o { ok: false, error: '...' }
-async function loginUser({ username, password }) {
-  const normalized = username.trim().toLowerCase();
-
-  // Admin — chequeo fijo, independiente de la lista de usuarios registrados
-  if (normalized === ADMIN_USERNAME) {
-    if (password === ADMIN_PASSWORD) {
-      setSession({ name: 'Administrador', email: ADMIN_USERNAME, role: 'admin' });
-      return { ok: true, role: 'admin' };
-    }
-    return { ok: false, error: 'Usuario o contraseña incorrectos.' };
-  }
-
-  // Cliente registrado
-  const users = loadUsers();
-  const user = users.find(u => u.email === normalized);
-  if (!user) return { ok: false, error: 'Usuario o contraseña incorrectos.' };
-
-  const passwordHash = await hashPassword(password);
-  if (passwordHash !== user.passwordHash) {
-    return { ok: false, error: 'Usuario o contraseña incorrectos.' };
-  }
-
-  setSession({ name: user.name, email: user.email, role: 'customer' });
-  return { ok: true, role: 'customer' };
-}
-
-function logout() {
+// Cierra sesión y vuelve al inicio
+function logoutUser(redirect = 'index.html') {
   clearSession();
-  location.href = 'index.html';
+  location.href = redirect;
+}
+const logout = logoutUser; // alias por si tu navbar usa este nombre
+
+// Para páginas que exigen sesión: requireAuth() al inicio del script
+function requireAuth() {
+  const s = getSession();
+  if (!s) {
+    const page = location.pathname.split('/').pop() || 'index.html';
+    location.replace(`login.html?redirect=${encodeURIComponent(page)}`);
+  }
+  return s;
+}
+
+function mensajeDeError(e, esRegistro) {
+  if (e.status === 401) return 'Correo o contraseña incorrectos.';
+  if (e.status === 409 && esRegistro) return 'Ya existe una cuenta con ese correo.';
+  if (e.status === 400 && e.details) {
+    const campos = Object.keys(e.details);
+    if (campos.includes('email')) return 'Escribe un correo válido.';
+    if (campos.includes('password')) return 'La contraseña debe tener al menos 8 caracteres.';
+    if (campos.includes('nombre')) return 'El nombre debe tener al menos 2 caracteres.';
+  }
+  if (e instanceof TypeError) return 'No pudimos conectar con el servidor. Inténtalo de nuevo.';
+  return e.message || 'Ocurrió un error. Inténtalo de nuevo.';
+}
+
+// ── Login: { username } es el correo ──
+async function loginUser({ username, password }) {
+  try {
+    const usuario = await Api.login(username.trim(), password);
+    const s = saveSession(usuario);
+    return { ok: true, role: s.role };
+  } catch (e) {
+    return { ok: false, error: mensajeDeError(e, false) };
+  }
+}
+
+// ── Registro ──
+async function registerUser({ name, email, password }) {
+  try {
+    const usuario = await Api.registro(name.trim(), email.trim(), password);
+    const s = saveSession({ ...usuario, rol: 'CLIENTE' });
+    return { ok: true, role: s.role };
+  } catch (e) {
+    return { ok: false, error: mensajeDeError(e, true) };
+  }
 }

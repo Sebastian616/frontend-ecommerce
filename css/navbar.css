@@ -235,3 +235,5 @@
   .hamburger { display: flex; }
   .mobile-nav { padding: 80px 32px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 }
+/* Añade esto al final de css/navbar.css y ajusta a tu paleta */
+.pill-nav .nav-admin { font-weight: 600; }
